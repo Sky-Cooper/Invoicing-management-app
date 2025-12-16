@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+InvoicingManagement-venv/
+
+# Django
+*.sqlite3
+*.log
+db.sqlite3
+media/
+
+# Environment variables
+.env
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Byte-compiled / temporary files
+*.swp
+*.DS_Store
+
+# Pip
+pip-log.txt
