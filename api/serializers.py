@@ -1,7 +1,16 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
 from django.db import transaction
-from api.models import User, CompanyProfile, UserRole, Department, Client
+from api.models import (
+    User,
+    CompanyProfile,
+    UserRole,
+    Department,
+    Client,
+    Chantier,
+    Employee,
+    ChantierAssignment,
+)
 
 
 class CompanyOwnerRegistrationSerializer(serializers.Serializer):
@@ -191,6 +200,121 @@ class DepartmentAdminRetrieveSerializer(serializers.ModelSerializer):
         ]
 
 
+class UserNestedSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=False, min_length=8)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number",
+            "department",
+            "company",
+            "preferred_language",
+            "is_active",
+            "password",
+        ]
+        extra_kwargs = {
+            "email": {"required": False},
+            "phone_number": {"required": False},
+        }
+
+    def validate_email(self, value):
+        request = self.context.get("request")
+
+        if self.instance:
+
+            if User.objects.filter(email=value).exclude(id=self.instance.id).exists():
+                raise serializers.ValidationError(
+                    "User with this email already exists."
+                )
+        else:
+
+            if User.objects.filter(email=value).exists():
+                raise serializers.ValidationError(
+                    "User with this email already exists."
+                )
+
+        return value
+
+    def validate_phone_number(self, value):
+        if not value:
+            return value
+
+        if self.instance:
+
+            if (
+                User.objects.filter(phone_number=value)
+                .exclude(id=self.instance.id)
+                .exists()
+            ):
+                raise serializers.ValidationError(
+                    "User with this phone number already exists."
+                )
+        else:
+
+            if User.objects.filter(phone_number=value).exists():
+                raise serializers.ValidationError(
+                    "User with this phone number already exists."
+                )
+
+        return value
+
+    def update(self, instance, validated_data):
+
+        password = validated_data.pop("password", None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if password:
+            instance.set_password(password)
+
+        instance.save()
+        return instance
+
+
+class EmployeeSerializer(serializers.ModelSerializer):
+    user = UserNestedSerializer()
+
+    class Meta:
+        model = Employee
+        fields = [
+            "id",
+            "user",
+            "cin",
+            "job_title",
+            "hire_date",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop("user", None)
+
+        if user_data:
+            user = instance.user
+            password = user_data.pop("password", None)
+
+            for attr, value in user_data.items():
+                setattr(user, attr, value)
+
+            if password:
+                user.set_password(password)
+
+            user.save()
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance
+
+
 class DepartmentAdminCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
 
@@ -238,3 +362,82 @@ class DepartmentAdminCreateSerializer(serializers.ModelSerializer):
             company=request_user.company,
             is_staff=True,
         )
+
+
+class ClientSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Client
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "company"]
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        if not user.role == UserRole.COMPANY_ADMIN:
+            raise serializers.ValidationError(
+                "only super admins or company owner that can access this resource"
+            )
+
+        validated_data["company"] = user.company
+
+        return super().create(validated_data)
+
+
+class ChantierAssignmentSerializer(serializers.ModelSerializer):
+    employee = EmployeeSerializer(read_only=True)
+    employee_id = serializers.PrimaryKeyRelatedField(
+        queryset=Employee.objects.all(),
+        source="employee",
+        write_only=True,
+    )
+    chantier_id = serializers.PrimaryKeyRelatedField(
+        queryset=Chantier.objects.all(),
+        source="chantier",
+        write_only=True,
+    )
+
+    class Meta:
+        model = ChantierAssignment
+        fields = [
+            "id",
+            "employee",
+            "employee_id",
+            "chantier_id",
+            "description",
+            "start_date",
+            "end_date",
+            "is_active",
+        ]
+
+
+class ChantierSerializer(serializers.ModelSerializer):
+    responsible = DepartmentAdminRetrieveSerializer(read_only=True)
+    responsible_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(role=UserRole.HR_ADMIN),
+        source="responsible",
+        write_only=True,
+        required=False,
+    )
+
+    employees = ChantierAssignmentSerializer(
+        source="employee_assignments", many=True, read_only=True
+    )
+
+    class Meta:
+        model = Chantier
+        fields = [
+            "id",
+            "name",
+            "location",
+            "description",
+            "contract_number",
+            "contract_date",
+            "department",
+            "client",
+            "responsible",
+            "responsible_id",
+            "start_date",
+            "end_date",
+            "employees",
+            "created_at",
+        ]

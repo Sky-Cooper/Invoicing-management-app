@@ -160,9 +160,50 @@ class Client(models.Model):
     email = models.EmailField(blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    company = models.ForeignKey(
+        CompanyProfile, on_delete=models.SET_NULL, null=True, related_name="clients"
+    )
 
     def __str__(self):
         return self.company_name
+
+
+class Employee(models.Model):
+    cin = models.CharField(max_length=50, unique=True)
+    job_title = models.CharField(max_length=150)
+    user = models.OneToOneField(
+        User, on_delete=models.SET_NULL, null=True, related_name="employee_profile"
+    )
+    hire_date = models.DateField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.get_full_name() if self.user else {self.id }}"
+
+
+class ChantierAssignment(models.Model):
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="chantier_assignments",
+    )
+    chantier = models.ForeignKey(
+        "Chantier", on_delete=models.CASCADE, related_name="employee_assignments"
+    )
+    description = models.TextField(max_length=128, null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("employee", "chantier")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.employee.user.get_full_name()} -> {self.chantier.name}"
 
 
 class Chantier(models.Model):
@@ -184,6 +225,12 @@ class Chantier(models.Model):
         Department, on_delete=models.SET_NULL, null=True, related_name="chantiers"
     )
 
+    employees = models.ManyToManyField(
+        Employee,
+        through="ChantierAssignment",
+        related_name="chantiers",
+    )
+
     responsible = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -195,25 +242,24 @@ class Chantier(models.Model):
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
 
+    @property
+    def status(self):
+        """Calculate project status based on dates"""
+        from django.utils import timezone
 
-class Employee(models.Model):
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    cin = models.CharField(max_length=50, unique=True)
-    job_title = models.CharField(max_length=150)
+        today = timezone.now().date()
 
-    assigned_chantier = models.ForeignKey(
-        Chantier, on_delete=models.SET_NULL, null=True, related_name="employees"
-    )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+        if today < self.start_date:
+            return "NOT_STARTED"
+        elif self.end_date and today > self.end_date:
+            return "COMPLETED"
+        else:
+            return "IN_PROGRESS"
 
 
 class Attendance(models.Model):

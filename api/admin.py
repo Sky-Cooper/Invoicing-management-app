@@ -124,8 +124,37 @@ class ChantierAdmin(admin.ModelAdmin):
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ("first_name", "last_name", "cin", "job_title", "assigned_chantier")
-    search_fields = ("first_name", "last_name", "cin")
+    list_display = (
+        "first_name",
+        "last_name",
+        "cin",
+        "job_title",
+        "assigned_chantiers",
+    )
+    search_fields = (
+        "cin",
+        "user__first_name",
+        "user__last_name",
+        "user__email",
+    )
+
+    def first_name(self, obj):
+        return obj.user.first_name
+
+    first_name.admin_order_field = "user__first_name"
+
+    def last_name(self, obj):
+        return obj.user.last_name
+
+    last_name.admin_order_field = "user__last_name"
+
+    def assigned_chantiers(self, obj):
+        return ", ".join(
+            ca.chantier.name
+            for ca in obj.user.chantier_assignments.filter(is_active=True)
+        )
+
+    assigned_chantiers.short_description = "Assigned Chantiers"
 
 
 @admin.register(Attendance)

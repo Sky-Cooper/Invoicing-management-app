@@ -1,5 +1,14 @@
 from django.shortcuts import render
-from .models import User, UserRole, CompanyProfile, Department
+from .models import (
+    User,
+    UserRole,
+    CompanyProfile,
+    Department,
+    Client,
+    Employee,
+    Chantier,
+    ChantierAssignment,
+)
 from .serializers import (
     CustomTokenObtainPairSerializer,
     CompanyOwnerRegistrationSerializer,
@@ -8,6 +17,10 @@ from .serializers import (
     DepartmentSerializer,
     DepartmentAdminRetrieveSerializer,
     DepartmentAdminCreateSerializer,
+    ClientSerializer,
+    EmployeeSerializer,
+    ChantierAssignmentSerializer,
+    ChantierSerializer,
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.views import APIView
@@ -173,3 +186,142 @@ class DepartmentAdminRetrieveViewSet(generics.RetrieveAPIView):
             raise PermissionDenied("only departments admin can access this endpoint")
 
         return user
+
+
+class ClientViewSet(viewsets.ModelViewSet):
+    serializer_class = ClientSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.is_superuser:
+            return Client.objects.all()
+
+        if user.role == UserRole.COMPANY_ADMIN:
+            return Client.objects.filter(company=user.company)
+
+        return Client.objects.none()
+
+    def perform_update(self, serializer):
+        client = self.get_object()
+        user = self.request.user
+
+        if not user.is_superuser and use.role != UserRole.COMPANY_ADMIN:
+            raise PermissionDenied(
+                "only super admins or company admins that can modify clients"
+            )
+
+        if user.company != client.company:
+            raise PermissionDenied(
+                "You cannot modify this client because they dont belong to your company"
+            )
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+
+        if not user.is_superuser and user.role != UserRole.COMPANY_ADMIN:
+            raise PermissionDenied(
+                "only super admins or company admins that can delete clients"
+            )
+
+        if user.company != instance.company:
+            raise PermissionDenied(
+                "you cannot delete this client because they dont belong to your company"
+            )
+
+        instance.delete()
+
+
+class EmployeeViewSet(viewsets.ModelViewSet):
+    serializer_class = EmployeeSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.is_superuser:
+            return Employee.objects.all()
+
+        if user.role == UserRole.COMPANY_ADMIN:
+            return Employee.objects.filter(user__company=user.company)
+
+        return Employee.objects.none()
+
+    def perform_destroy(self, instance):
+        request_user = self.request.user
+        if (
+            not request_user.is_superuser
+            and request_user.role != UserRole.COMPANY_ADMIN
+        ):
+            raise PermissionDenied(
+                "only super admins and company admins can access this resource"
+            )
+
+        user = instance.user
+        instance.delete()
+        user.delete()
+
+
+class ChantierViewSet(viewsets.ModelViewSet):
+    serializer_class = ChantierSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        qs = Chantier.objects.select_related(
+            "department", "client", "responsible"
+        ).prefetch_related("employee_assignments__employee__user")
+
+        if user.is_superuser:
+            return qs
+
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
+            return qs.filter(department__company=user.company)
+
+        if user.role == UserRole.EMPLOYEE:
+            return qs.filter(employee_assignments__employee__user=user).distinct()
+
+        return qs.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+
+        if user.role not in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
+            raise PermissionDenied("Only admins can create chantiers")
+
+        serializer.save()
+
+
+class ChantierAssignmentViewSet(viewsets.ModelViewSet):
+    serializer_class = ChantierAssignmentSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        qs = ChantierAssignment.objects.select_related(
+            "employee__user", "chantier", "chantier__department"
+        )
+
+        if user.is_superuser:
+            return qs
+
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
+            return qs.filter(chantier__department__company=user.company)
+
+        if user.role == UserRole.EMPLOYEE:
+            return qs.filter(employee__user=user)
+
+        return qs.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+
+        if user.role not in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
+            raise PermissionDenied("Only admins can assign employees")
+
+        serializer.save()

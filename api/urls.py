@@ -7,6 +7,10 @@ from .views import (
     DepartmentViewSet,
     DepartmentAdminRetrieveViewSet,
     DepartmentAdminViewSet,
+    ClientViewSet,
+    EmployeeViewSet,
+    ChantierAssignmentViewSet,
+    ChantierViewSet,
 )
 
 
@@ -15,7 +19,14 @@ router.register(r"departments", DepartmentViewSet, basename="departments")
 router.register(
     r"departments-admins", DepartmentAdminViewSet, basename="departments-admins"
 )
-
+router.register(r"clients", ClientViewSet, basename="clients")
+router.register(r"employees", EmployeeViewSet, basename="employees")
+router.register(r"chantiers", ChantierViewSet, basename="chantiers")
+router.register(
+    r"chantiers-assignments",
+    ChantierAssignmentViewSet,
+    basename="chantier-assignments",
+)
 
 urlpatterns = [
     path("register/company-owner", CompanyOwnerRegistrationView.as_view()),
