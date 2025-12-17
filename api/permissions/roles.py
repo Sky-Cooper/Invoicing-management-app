@@ -52,3 +52,12 @@ class CanManageInvoices(BasePermission):
             UserRole.COMPANY_ADMIN,
             UserRole.INVOICING_ADMIN,
         }
+
+
+class IsCompanyOrSuperAdmin(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        allowed_roles = [UserRole.COMPANY_ADMIN]
+        return request.user.role in allowed_roles

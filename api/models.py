@@ -66,18 +66,7 @@ class ApplicationUserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
-class Department(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
-
-
 class CompanyProfile(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     address = models.TextField()
     phone = PhoneNumberField(region="MA")
@@ -87,7 +76,7 @@ class CompanyProfile(models.Model):
         max_length=50, verbose_name="Registre de Commerce", blank=True, null=True
     )
     patent = models.CharField(max_length=50, blank=True, null=True)
-    website = models.URLField(blank=True, null=True)  # Added from PDF (STEWEB)
+    website = models.URLField(blank=True, null=True)
     bank_name = models.CharField(max_length=255, blank=True, null=True)
     bank_account_number = models.CharField(max_length=100, blank=True, null=True)
     bank_rib = models.CharField(max_length=100, blank=True, null=True)
@@ -99,8 +88,25 @@ class CompanyProfile(models.Model):
         return self.name
 
 
+class Department(models.Model):
+    name = models.CharField(max_length=100, null=False, blank=False)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    company = models.ForeignKey(
+        CompanyProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="departments",
+    )
+
+    class Meta:
+        unique_together = ("company", "name")
+
+    def __str__(self):
+        return self.name
+
+
 class User(AbstractBaseUser, PermissionsMixin):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
@@ -141,7 +147,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class Client(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company_name = models.CharField(max_length=255)
     contact_name = models.CharField(max_length=255)
     ice = models.CharField(max_length=20, verbose_name="ICE")
@@ -161,7 +166,6 @@ class Client(models.Model):
 
 
 class Chantier(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -197,7 +201,6 @@ class Chantier(models.Model):
 
 
 class Employee(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     cin = models.CharField(max_length=50, unique=True)
@@ -214,7 +217,6 @@ class Employee(models.Model):
 
 
 class Attendance(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     employee = models.ForeignKey(
         Employee, on_delete=models.CASCADE, related_name="attendances"
     )
@@ -231,7 +233,6 @@ class Attendance(models.Model):
 
 
 class Item(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=50, blank=True, null=True)  # For "Poste" in PDF
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -246,7 +247,6 @@ class Item(models.Model):
 
 
 class Invoice(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     invoice_number = models.CharField(max_length=50, unique=True)  # Format: 006/2025
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="invoices"
@@ -313,7 +313,6 @@ class Invoice(models.Model):
 
 
 class InvoiceItem(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="items")
     item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True)
 
@@ -346,7 +345,6 @@ class InvoiceItem(models.Model):
 
 
 class Expense(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     chantier = models.ForeignKey(
         Chantier, on_delete=models.CASCADE, related_name="expenses"
     )
@@ -362,7 +360,6 @@ class Expense(models.Model):
 
 
 class Payment(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     invoice = models.ForeignKey(
         Invoice, on_delete=models.CASCADE, related_name="payments"
     )

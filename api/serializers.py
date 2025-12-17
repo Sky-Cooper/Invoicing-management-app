@@ -1,7 +1,7 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
 from django.db import transaction
-from api.models import User, CompanyProfile, UserRole
+from api.models import User, CompanyProfile, UserRole, Department, Client
 
 
 class CompanyOwnerRegistrationSerializer(serializers.Serializer):
@@ -155,3 +155,86 @@ class CompanyProfileSerializer(serializers.ModelSerializer):
             )
 
         return super().update(instance, validated_data)
+
+
+class DepartmentSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Department
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "company"]
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+
+        validated_data["company"] = user.company
+
+        return super().create(validated_data)
+
+
+class DepartmentAdminRetrieveSerializer(serializers.ModelSerializer):
+
+    department = DepartmentSerializer(read_only=True)
+    company = CompanyProfileSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number",
+            "role",
+            "department",
+            "company",
+        ]
+
+
+class DepartmentAdminCreateSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=8)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "password",
+            "phone_number",
+            "role",
+            "department",
+        ]
+
+        read_only_fields = ["id"]
+
+    def validate_role(self, value):
+        if not value in [UserRole.HR_ADMIN, UserRole.INVOICING_ADMIN]:
+            raise serializers.ValidationError("invalid department admin role")
+
+        return value
+
+    def validate_department(self, department):
+        user = self.context["request"].user
+        if department.company != user.company:
+            raise serializers.ValidationError(
+                "this department does not belong to your company"
+            )
+
+        return department
+
+    def create(self, validated_data):
+        request_user = self.context["request"].user
+
+        return User.objects.create_user(
+            email=validated_data["email"],
+            password=validated_data["password"],
+            first_name=validated_data["first_name"],
+            last_name=validated_data["last_name"],
+            phone_number=validated_data["phone_number"],
+            role=validated_data["role"],
+            department=validated_data["department"],
+            company=request_user.company,
+            is_staff=True,
+        )
