@@ -3,86 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { size: A4; margin: 1cm; }
-        body { font-family: 'Arial', sans-serif; color: #333; font-size: 12px; line-height: 1.4; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
-        .company-logo { width: 150px; }
-        .company-info h1 { color: #1a4d80; margin: 0; font-size: 24px; }
-        .company-info p { margin: 2px 0; font-weight: bold; }
-        .invoice-title { text-align: center; background: #f2f2f2; padding: 10px; border: 1px solid #ccc; margin: 20px 0; font-size: 18px; font-weight: bold; }
-        .details-grid { display: flex; justify-content: space-between; margin-bottom: 30px; }
-        .client-box { border: 1px solid #000; padding: 10px; width: 60%; margin-left: auto; }
+        @page { size: A4; margin: 1.5cm; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; color: #1a1a1a; font-size: 11px; line-height: 1.5; }
+        
+        /* Header Section */
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 2px solid #1a4d80; padding-bottom: 10px; }
+        .company-info h1 { color: #1a4d80; margin: 0; font-size: 28px; letter-spacing: 2px; }
+        .company-info .slogan { color: #555; font-style: italic; font-size: 10px; margin-top: -5px; margin-bottom: 10px; display: block; }
+        .company-logo { height: 70px; object-fit: contain; }
+
+        /* Invoice Meta */
+        .invoice-title { text-align: center; background: #f8f9fa; padding: 12px; border: 1px solid #dee2e6; margin: 20px 0; font-size: 16px; font-weight: bold; color: #1a4d80; text-transform: uppercase; }
+        .meta-date { font-weight: bold; margin-bottom: 20px; }
+
+        /* Client Box */
+        .client-container { display: flex; justify-content: flex-end; margin-bottom: 30px; }
+        .client-box { border: 1px solid #1a4d80; padding: 15px; width: 65%; border-radius: 4px; }
         .client-box table { width: 100%; border-collapse: collapse; }
-        .client-box td { padding: 3px; vertical-align: top; }
+        .client-box td { padding: 4px 0; vertical-align: top; }
+        .label { font-weight: bold; color: #1a4d80; width: 100px; }
+
+        /* Main Table */
         .data-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .data-table th { background: #e6e6e6; border: 1px solid #000; padding: 8px; text-align: center; }
-        .data-table td { border: 1px solid #000; padding: 8px; }
-        .totals-wrapper { margin-top: 20px; display: flex; justify-content: flex-end; }
-        .totals-table { width: 45%; border-collapse: collapse; float: right; }
-        .totals-table td { border: 1px solid #000; padding: 6px 10px; }
-        .totals-table td:first-child { font-weight: bold; background: #f9f9f9; }
-        .footer-text { margin-top: 40px; font-style: italic; font-weight: bold; border-top: 1px solid #000; padding-top: 10px; }
+        .data-table th { background: #1a4d80; color: white; border: 1px solid #1a4d80; padding: 10px; text-align: center; text-transform: uppercase; font-size: 10px; }
+        .data-table td { border: 1px solid #dee2e6; padding: 10px; vertical-align: middle; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+
+        /* Totals Section */
+        .totals-container { display: flex; justify-content: flex-end; margin-top: 20px; }
+        .totals-table { width: 45%; border-collapse: collapse; }
+        .totals-table td { border: 1px solid #dee2e6; padding: 8px 12px; }
+        .totals-table .total-label { background: #f8f9fa; font-weight: bold; color: #1a4d80; }
+        .totals-table .grand-total { background: #1a4d80; color: white; font-size: 13px; font-weight: bold; }
+
+        /* Footer */
+        .footer-legal { margin-top: 50px; padding-top: 10px; border-top: 1px double #1a4d80; font-style: italic; font-weight: bold; font-size: 12px; }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="company-info">
-            <h1>{{ company.name }}</h1> <p>{{ company.title|default:"VOTRE STRUCTURE NOTRE EXCELLENCE" }}</p> <p>I.C.E: {{ company.ice }}</p> </div>
+            <h1>{{ company.name }}</h1> <span class="slogan">{{ company.title|default:"VOTRE STRUCTURE - NOTRE EXCELLENCE" }}</span> <p style="margin: 0;">I.C.E: {{ company.ice }}</p> </div>
         {% if logo_path %}
         <img src="file://{{ logo_path }}" class="company-logo">
         {% endif %}
     </div>
 
-    <div class="invoice-title">FACTURE N°: {{ invoice.invoice_number }}</div> <p><strong>Date: {{ invoice.issued_date|date:"d/m/Y" }}</strong></p> <div class="client-box">
-        <strong>Client</strong> <table>
-            <tr><td width="30%">Nom :</td><td>{{ invoice.client.company_name }}</td></tr> <tr><td>ICE :</td><td>{{ invoice.client.ice }}</td></tr> <tr><td>Adresse :</td><td>{{ invoice.client.address }}</td></tr> <tr><td>Objet :</td><td>{{ invoice.project_description }}</td></tr> <tr><td>Contrat N° :</td><td>{{ invoice.contract_number }}</td></tr> </table>
+    <div class="invoice-title">FACTURE N°: {{ invoice.invoice_number }}</div> <div class="meta-date">Date: {{ invoice.issued_date|date:"d/m/Y" }}</div> <div class="client-container">
+        <div class="client-box">
+            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 10px; color: #1a4d80;">CLIENT :</div>
+            <table>
+                <tr><td class="label">Nom :</td><td>{{ invoice.client.company_name }}</td></tr> <tr><td class="label">ICE :</td><td>{{ invoice.client.ice }}</td></tr> <tr><td class="label">Adresse :</td><td>{{ invoice.client.address }}</td></tr> <tr><td class="label">Objet :</td><td>{{ invoice.project_description }}</td></tr> <tr><td class="label">Contrat N° :</td><td>{{ invoice.contract_number }}</td></tr> </table>
+        </div>
     </div>
 
     <table class="data-table">
         <thead>
             <tr>
-                <th width="10%">Poste</th>
-                <th width="45%">Designation</th>
-                <th width="10%">UN</th>
-                <th width="10%">QTE</th>
-                <th width="12%">PU HT</th>
-                <th width="13%">PT HT</th>
-            </tr> </thead>
+                <th width="8%">Poste</th> <th width="42%">Designation</th> <th width="10%">UN</th> <th width="10%">QTE</th> <th width="15%">PU HT (DH)</th> <th width="15%">PT HT (DH)</th> </tr>
+        </thead>
         <tbody>
             {% for item in invoice.invoice_items.all %}
             <tr>
-                <td align="center">{{ item.item_code|default:forloop.counter }}</td>
-                <td>{{ item.item_name }}<br><small>{{ item.item_description|default:"" }}</small></td>
-                <td align="center">{{ item.unit }}</td>
-                <td align="center">{{ item.quantity }}</td>
-                <td align="right">{{ item.unit_price|floatformat:2 }}</td>
-                <td align="right">{{ item.subtotal|floatformat:2 }}</td>
+                <td class="text-center">{{ item.item_code|default:forloop.counter }}</td>
+                <td><strong>{{ item.item_name }}</strong><br><span style="color: #666; font-size: 9px;">{{ item.item_description|default:"" }}</span></td>
+                <td class="text-center">{{ item.unit }}</td>
+                <td class="text-center">{{ item.quantity }}</td>
+                <td class="text-right">{{ item.unit_price|floatformat:2 }}</td>
+                <td class="text-right">{{ item.subtotal|floatformat:2 }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 
-    <div class="totals-wrapper">
+    <div class="totals-container">
         <table class="totals-table">
-            <tr>
-                <td>Total HT (DH)</td>
-                <td align="right">{{ invoice.subtotal|floatformat:2 }}</td>
-            </tr> <tr>
-                <td>Réception provisoire 10% (DH)</td>
-                <td align="right">{{ invoice.discount_amount|floatformat:2 }}</td>
-            </tr> <tr>
-                <td>TOTAL HT APRES DEDUCTION (DH)</td>
-                <td align="right">{{ invoice.total_ht|floatformat:2 }}</td>
-            </tr> <tr>
-                <td>TVA {{ invoice.tax_rate|floatformat:0 }}% (DH)</td>
-                <td align="right">{{ invoice.tax_amount|floatformat:2 }}</td>
-            </tr> <tr style="font-size: 14px;">
-                <td>TOTAL TTC (DH)</td>
-                <td align="right"><strong>{{ invoice.total_ttc|floatformat:2 }}</strong></td>
-            </tr> </table>
+            <tr><td class="total-label">Total HT</td><td class="text-right">{{ invoice.subtotal|floatformat:2 }}</td></tr> <tr><td class="total-label">Réception provisoire (10%)</td><td class="text-right">{{ invoice.discount_amount|floatformat:2 }}</td></tr> <tr><td class="total-label">PRIX HT APRES DEDUCTION</td><td class="text-right">{{ invoice.total_ht|floatformat:2 }}</td></tr> <tr><td class="total-label">TVA (20%)</td><td class="text-right">{{ invoice.tax_amount|floatformat:2 }}</td></tr> <tr><td class="grand-total">TOTAL TTC (DH)</td><td class="text-right grand-total">{{ invoice.total_ttc|floatformat:2 }}</td></tr> </table>
     </div>
 
-    <div class="footer-text">
-        Arrêtée la présente facture à la somme de: {{ invoice.amount_in_words|upper }}
-    </div> </body>
+    <div class="footer-legal">
+        Arrêtée la présente facture à la somme de : {{ invoice.amount_in_words|upper }} </div>
+</body>
 </html>

@@ -427,28 +427,56 @@ class InvoiceCreateApiView(APIView):
         )
         serializer.is_valid(raise_exception=True)
 
-        # 1. Save Basic Invoice Data
         items_data = serializer.validated_data.pop("items")
         invoice = serializer.save(created_by=request.user)
 
-        # 2. Create Invoice Items
-        # This allows the task to access items via invoice.invoice_items.all()
         for item_data in items_data:
             InvoiceItem.objects.create(invoice=invoice, **item_data)
 
-        # 3. Trigger Async Task after DB commit
-        # We pass only the ID to keep the task payload light
         transaction.on_commit(lambda: generate_invoice_pdf_task.delay(invoice.id))
-
-        # 4. Prepare Response
-        # Note: At this exact moment, the PDF might still be generating,
-        # so we return the object data immediately.
         data = InvoiceSerializer(invoice).data
 
-        # Provide a predictable URL where the file will eventually be
         pdf_filename = f"facture_{invoice.invoice_number.replace('/', '_')}.pdf"
         data["download_url"] = request.build_absolute_uri(
             f"{settings.MEDIA_URL}invoices/{pdf_filename}"
         )
 
         return Response(data, status=status.HTTP_201_CREATED)
+
+    def get(self, request):
+        user = request.user
+
+        if user.is_superuser:
+            queryset = Invoice.objects.all()
+        elif user.role in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN]:
+            queryset = Invoice.objects.filter(created_by__company=user.company)
+        else:
+            return Response([], status=status.HTTP_200_OK)
+
+        created_by_id = request.query_params.get("created_by")
+        status_param = request.query_params.get("status")
+        issued_date = request.query_params.get("issued_date")
+        due_date = request.query_params.get("due_date")
+        payment_date = request.query_params.get("payment_date")
+        created_at = request.query_params.get("created_at")
+
+        if created_by_id:
+            queryset = queryset.filter(created_by_id=created_by_id)
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+        if issued_date:
+            queryset = queryset.filter(issued_date=issued_date)
+        if due_date:
+            queryset = queryset.filter(due_date=due_date)
+        if payment_date:
+            queryset = queryset.filter(payment_date=payment_date)
+        if created_at:
+
+            queryset = queryset.filter(created_at__date=created_at)
+
+        queryset = queryset.select_related("client", "created_by").prefetch_related(
+            "invoice_items"
+        )
+
+        serializer = InvoiceSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

@@ -14,39 +14,25 @@ class InvoiceGenerator:
     @staticmethod
     def generate_pdf(invoice):
 
-        # 1. Prepare Paths
-
         logo_path = os.path.join(
             settings.BASE_DIR, "static", "assets", "companyLogo.jpg"
         )
-
-        # 2. Re-calculate totals based on Moroccan Template Logic
 
         items = invoice.invoice_items.all()
 
         subtotal = sum(i.subtotal for i in items)
 
-        # Deduction of 10% (Retention) as per template
-
         retention_rate = Decimal("10.0")
 
         discount_amount = subtotal * (retention_rate / Decimal("100"))
 
-        # HT After Deduction [cite: 18, 27]
-
         total_ht = subtotal - discount_amount
-
-        # TVA 20% on the remaining HT [cite: 19, 28]
 
         tax_rate = Decimal("20.0")
 
         tax_amount = total_ht * (tax_rate / Decimal("100"))
 
-        # Final TTC [cite: 20, 29]
-
         total_ttc = total_ht + tax_amount
-
-        # Update Invoice Instance
 
         invoice.subtotal = subtotal
 
@@ -64,8 +50,6 @@ class InvoiceGenerator:
 
         invoice.save()
 
-        # 3. Render HTML
-
         context = {
             "invoice": invoice,
             "company": invoice.created_by.company,
@@ -73,8 +57,6 @@ class InvoiceGenerator:
         }
 
         html_string = render_to_string("pdf/invoice_template.html", context)
-
-        # 4. Generate PDF
 
         pdf_name = f"invoice_{invoice.invoice_number.replace('/', '-')}.pdf"
 

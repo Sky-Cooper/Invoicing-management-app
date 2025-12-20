@@ -16,12 +16,11 @@ from .services import InvoiceCalculator
 )
 def generate_invoice_pdf_task(self, invoice_id):
     try:
-        # Load invoice
+
         invoice = Invoice.objects.select_related("client", "created_by__company").get(
             id=invoice_id
         )
 
-        # 1. Business Logic Calculation (10% Retention, 20% TVA) [cite: 17, 18, 19]
         totals = InvoiceCalculator.get_totals(invoice)
         invoice.subtotal = totals["subtotal"]
         invoice.discount_percentage = totals["discount_percentage"]
@@ -31,7 +30,6 @@ def generate_invoice_pdf_task(self, invoice_id):
         invoice.tax_amount = totals["tax_amount"]
         invoice.total_ttc = totals["total_ttc"]
 
-        # 2. Legal Amount in Words
         ttc_value = invoice.total_ttc
         dirhams = int(ttc_value)
         centimes = int(round((ttc_value - dirhams) * 100))
@@ -45,7 +43,6 @@ def generate_invoice_pdf_task(self, invoice_id):
         invoice.amount_in_words = legal_text.upper()
         invoice.save()
 
-        # 3. PDF Rendering
         logo_path = os.path.join(
             settings.BASE_DIR, "static", "assets", "companyLogo.jpg"
         )
@@ -56,7 +53,6 @@ def generate_invoice_pdf_task(self, invoice_id):
             "logo_path": logo_path,
         }
 
-        # 4. Critical: Render using the correct path
         html_string = render_to_string("pdf/invoice_pdf.html", context)
 
         pdf_filename = f"facture_{invoice.invoice_number.replace('/', '_')}.pdf"
@@ -67,7 +63,6 @@ def generate_invoice_pdf_task(self, invoice_id):
 
         pdf_path = os.path.join(pdf_directory, pdf_filename)
 
-        # Generate PDF using the absolute BASE_DIR for WeasyPrint
         HTML(string=html_string, base_url=settings.BASE_DIR).write_pdf(pdf_path)
 
         return f"Invoice {invoice.invoice_number} successfully generated."
