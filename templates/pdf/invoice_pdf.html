@@ -3,71 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { size: A4; margin: 1.5cm; }
-        body { font-family: 'Helvetica', 'Arial', sans-serif; color: #1a1a1a; font-size: 11px; line-height: 1.5; }
+        @page { size: A4; margin: 1.2cm; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; color: #000; font-size: 10px; line-height: 1.4; margin: 0; padding: 0; }
         
-        /* Header Section */
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 2px solid #1a4d80; padding-bottom: 10px; }
-        .company-info h1 { color: #1a4d80; margin: 0; font-size: 28px; letter-spacing: 2px; }
-        .company-info .slogan { color: #555; font-style: italic; font-size: 10px; margin-top: -5px; margin-bottom: 10px; display: block; }
-        .company-logo { height: 70px; object-fit: contain; }
+   
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #D32F2F; padding-bottom: 10px; }
+        .company-info h1 { margin: 0; font-size: 26px; font-weight: bold; color: #000; text-transform: uppercase; }
+        .company-info .slogan { font-size: 11px; font-weight: bold; color: #D32F2F; text-transform: uppercase; display: block; }
+        .company-logo { height: 80px; object-fit: contain; }
 
-        /* Invoice Meta */
-        .invoice-title { text-align: center; background: #f8f9fa; padding: 12px; border: 1px solid #dee2e6; margin: 20px 0; font-size: 16px; font-weight: bold; color: #1a4d80; text-transform: uppercase; }
-        .meta-date { font-weight: bold; margin-bottom: 20px; }
+  
+        .invoice-meta { margin-bottom: 20px; }
+        .invoice-id { font-size: 16px; font-weight: bold; color: #000; margin-bottom: 5px; }
+        .date { font-weight: bold; font-size: 11px; }
 
-        /* Client Box */
-        .client-container { display: flex; justify-content: flex-end; margin-bottom: 30px; }
-        .client-box { border: 1px solid #1a4d80; padding: 15px; width: 65%; border-radius: 4px; }
-        .client-box table { width: 100%; border-collapse: collapse; }
-        .client-box td { padding: 4px 0; vertical-align: top; }
-        .label { font-weight: bold; color: #1a4d80; width: 100px; }
+      
+        .client-container { display: flex; justify-content: flex-end; margin-bottom: 35px; }
+        .client-box { border: 1.5px solid #000; padding: 12px; width: 60%; }
+        .client-box strong { display: block; text-decoration: underline; margin-bottom: 8px; font-size: 12px; color: #D32F2F; }
+        .client-table { width: 100%; border-collapse: collapse; }
+        .client-table td { padding: 3px 0; vertical-align: top; }
+        .client-label { font-weight: bold; width: 85px; color: #000; }
 
-        /* Main Table */
-        .data-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .data-table th { background: #1a4d80; color: white; border: 1px solid #1a4d80; padding: 10px; text-align: center; text-transform: uppercase; font-size: 10px; }
-        .data-table td { border: 1px solid #dee2e6; padding: 10px; vertical-align: middle; }
-        .text-right { text-align: right; }
+      
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+        .items-table th { border: 1.5px solid #000; background-color: #000; color: #FFF; padding: 8px; text-align: center; text-transform: uppercase; font-weight: bold; }
+        .items-table td { border: 1px solid #000; padding: 8px; vertical-align: top; }
         .text-center { text-align: center; }
+        .text-right { text-align: right; }
 
-        /* Totals Section */
-        .totals-container { display: flex; justify-content: flex-end; margin-top: 20px; }
-        .totals-table { width: 45%; border-collapse: collapse; }
-        .totals-table td { border: 1px solid #dee2e6; padding: 8px 12px; }
-        .totals-table .total-label { background: #f8f9fa; font-weight: bold; color: #1a4d80; }
-        .totals-table .grand-total { background: #1a4d80; color: white; font-size: 13px; font-weight: bold; }
+        .totals-container { display: flex; justify-content: flex-end; margin-top: 10px; }
+        .totals-table { width: 55%; border-collapse: collapse; }
+        .totals-table td { border: 1px solid #000; padding: 6px 10px; font-weight: bold; }
+        .total-label { text-align: left; background-color: #f9f9f9; }
+        .total-value { text-align: right; width: 30%; }
+        .grand-total { font-size: 13px; background-color: #D32F2F !important; color: #FFF; border: 1.5px solid #000; }
 
-        /* Footer */
-        .footer-legal { margin-top: 50px; padding-top: 10px; border-top: 1px double #1a4d80; font-style: italic; font-weight: bold; font-size: 12px; }
+        .legal-summary { margin-top: 40px; font-weight: bold; font-style: italic; border-bottom: 1px solid #000; padding-bottom: 5px; display: inline-block; font-size: 11px; }
+        
+        .page-footer { position: fixed; bottom: 0; width: 100%; text-align: center; border-top: 1.5px solid #D32F2F; padding-top: 10px; font-size: 9px; color: #000; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="company-info">
-            <h1>{{ company.name }}</h1> <span class="slogan">{{ company.title|default:"VOTRE STRUCTURE - NOTRE EXCELLENCE" }}</span> <p style="margin: 0;">I.C.E: {{ company.ice }}</p> </div>
+            <h1>{{ company.name }}</h1> <span class="slogan">{{ company.title|default:"VOTRE STRUCTURE" }}</span> <span class="slogan">{{ company.subtitle|default:"NOTRE EXCELLENCE" }}</span> </div>
         {% if logo_path %}
         <img src="file://{{ logo_path }}" class="company-logo">
         {% endif %}
     </div>
 
-    <div class="invoice-title">FACTURE N°: {{ invoice.invoice_number }}</div> <div class="meta-date">Date: {{ invoice.issued_date|date:"d/m/Y" }}</div> <div class="client-container">
+    <div class="invoice-meta">
+        <div class="invoice-id">FACTURE N°: {{ invoice.invoice_number }}</div> <div class="date">Date: {{ invoice.issued_date|date:"d/m/Y" }}</div> </div>
+
+    <div class="client-container">
         <div class="client-box">
-            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 10px; color: #1a4d80;">CLIENT :</div>
-            <table>
-                <tr><td class="label">Nom :</td><td>{{ invoice.client.company_name }}</td></tr> <tr><td class="label">ICE :</td><td>{{ invoice.client.ice }}</td></tr> <tr><td class="label">Adresse :</td><td>{{ invoice.client.address }}</td></tr> <tr><td class="label">Objet :</td><td>{{ invoice.project_description }}</td></tr> <tr><td class="label">Contrat N° :</td><td>{{ invoice.contract_number }}</td></tr> </table>
+            <strong>Client</strong>
+            <table class="client-table">
+                <tr><td class="client-label">Nom :</td><td>{{ invoice.client.company_name }}</td></tr> <tr><td class="client-label">ICE :</td><td>{{ invoice.client.ice }}</td></tr> <tr><td class="client-label">Adresse:</td><td>{{ invoice.client.address }}</td></tr> <tr><td class="client-label">Objet:</td><td>{{ invoice.project_description }}</td></tr> <tr><td class="client-label">Contrat N°:</td><td>{{ invoice.contract_number }}</td></tr> </table>
         </div>
     </div>
 
-    <table class="data-table">
+    <table class="items-table">
         <thead>
             <tr>
-                <th width="8%">Poste</th> <th width="42%">Designation</th> <th width="10%">UN</th> <th width="10%">QTE</th> <th width="15%">PU HT (DH)</th> <th width="15%">PT HT (DH)</th> </tr>
+                <th width="8%">Poste</th> <th width="42%">Designation</th>
+                <th width="10%">UN</th>
+                <th width="10%">QTE</th>
+                <th width="15%">PU HT (DH)</th>
+                <th width="15%">PT HT (DH)</th>
+            </tr>
         </thead>
         <tbody>
             {% for item in invoice.invoice_items.all %}
             <tr>
                 <td class="text-center">{{ item.item_code|default:forloop.counter }}</td>
-                <td><strong>{{ item.item_name }}</strong><br><span style="color: #666; font-size: 9px;">{{ item.item_description|default:"" }}</span></td>
+                <td>
+                    <strong>{{ item.item_name }}</strong><br>
+                    <span style="font-size: 9px; color: #333;">{{ item.item_description|default:"" }}</span>
+                </td>
                 <td class="text-center">{{ item.unit }}</td>
                 <td class="text-center">{{ item.quantity }}</td>
                 <td class="text-right">{{ item.unit_price|floatformat:2 }}</td>
@@ -79,10 +93,28 @@
 
     <div class="totals-container">
         <table class="totals-table">
-            <tr><td class="total-label">Total HT</td><td class="text-right">{{ invoice.subtotal|floatformat:2 }}</td></tr> <tr><td class="total-label">Réception provisoire (10%)</td><td class="text-right">{{ invoice.discount_amount|floatformat:2 }}</td></tr> <tr><td class="total-label">PRIX HT APRES DEDUCTION</td><td class="text-right">{{ invoice.total_ht|floatformat:2 }}</td></tr> <tr><td class="total-label">TVA (20%)</td><td class="text-right">{{ invoice.tax_amount|floatformat:2 }}</td></tr> <tr><td class="grand-total">TOTAL TTC (DH)</td><td class="text-right grand-total">{{ invoice.total_ttc|floatformat:2 }}</td></tr> </table>
+            <tr>
+                <td class="total-label">Total HT (DH)</td> <td class="total-value">{{ invoice.subtotal|floatformat:2 }}</td>
+            </tr>
+            <tr>
+                <td class="total-label">Réception provisoire et définitif 10% (DH)</td> <td class="total-value">{{ invoice.discount_amount|floatformat:2 }}</td>
+            </tr>
+            <tr>
+                <td class="total-label">PRIX TOTAL HT APRES DEDUCTION 10% (DH)</td> <td class="total-value">{{ invoice.total_ht|floatformat:2 }}</td>
+            </tr>
+            <tr>
+                <td class="total-label">TVA {{ invoice.tax_rate|floatformat:0 }}% (DH)</td> <td class="total-value">{{ invoice.tax_amount|floatformat:2 }}</td>
+            </tr>
+            <tr class="grand-total">
+                <td class="total-label" style="color: #FFF;">TOTAL TTC (DH)</td> <td class="total-value">{{ invoice.total_ttc|floatformat:2 }}</td>
+            </tr>
+        </table>
     </div>
 
-    <div class="footer-legal">
-        Arrêtée la présente facture à la somme de : {{ invoice.amount_in_words|upper }} </div>
+    <div class="legal-summary">
+        Arrêtée la présente facture à la somme de: {{ invoice.amount_in_words|upper }} </div>
+
+    <div class="page-footer">
+        {{ company.address|default:"HAY HASSANI DES ACTIVITES COMMERCIALES IMM N 85 APP N 6 YOUSSOFIA" }}<br> TEL: {{ company.phone|default:"+212 662-188772" }} | I.C.E: {{ company.ice|default:"003171124000097" }} </div>
 </body>
 </html>
