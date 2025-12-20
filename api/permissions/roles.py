@@ -47,7 +47,7 @@ class IsCompanyOrHRAdmin(BasePermission):
 
 class CanManageInvoices(BasePermission):
     def has_permission(self, request, view):
-        return request.user.role in {
+        return request.user.is_superuser or request.user.role in {
             UserRole.SUPER_ADMIN,
             UserRole.COMPANY_ADMIN,
             UserRole.INVOICING_ADMIN,

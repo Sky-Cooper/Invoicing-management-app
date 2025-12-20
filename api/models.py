@@ -6,6 +6,7 @@ from django.contrib.auth.models import (
 )
 from phonenumber_field.modelfields import PhoneNumberField
 import uuid
+from decimal import Decimal
 
 
 class LanguageChoices(models.TextChoices):
@@ -191,7 +192,7 @@ class ChantierAssignment(models.Model):
     chantier = models.ForeignKey(
         "Chantier", on_delete=models.CASCADE, related_name="employee_assignments"
     )
-    description = models.TextField(max_length=128, null=True, blank=True)
+    description = models.CharField(max_length=128, blank=True, null=True)
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -238,7 +239,6 @@ class Chantier(models.Model):
         related_name="responsible_chantiers",
         limit_choices_to={"role": UserRole.HR_ADMIN},
     )
-
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -279,21 +279,23 @@ class Attendance(models.Model):
 
 
 class Item(models.Model):
-    code = models.CharField(max_length=50, blank=True, null=True)  # For "Poste" in PDF
+    code = models.CharField(max_length=50, blank=True, null=True)  #
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
-    unit = models.CharField(max_length=50)  # UN in PDF (M², ML, etc.)
+    unit = models.CharField(max_length=50)
     tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-
     created_at = models.DateTimeField(auto_now_add=True)
+    company = models.ForeignKey(
+        CompanyProfile, on_delete=models.SET_NULL, null=True, related_name="items"
+    )
 
     def __str__(self):
         return f"{self.code} - {self.name}" if self.code else self.name
 
 
 class Invoice(models.Model):
-    invoice_number = models.CharField(max_length=50, unique=True)  # Format: 006/2025
+    invoice_number = models.CharField(max_length=50, unique=True)
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="invoices"
     )
@@ -307,7 +309,7 @@ class Invoice(models.Model):
     status = models.CharField(
         max_length=20, choices=InvoiceStatus.choices, default=InvoiceStatus.DRAFT
     )
-
+    Subject = models.CharField(max_length=255, null=True, blank=True)
     subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     discount_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -341,27 +343,16 @@ class Invoice(models.Model):
             models.Index(fields=["invoice_number"]),
         ]
 
-    def save(self, *args, **kwargs):
-
-        if not self.total_ht and self.subtotal and self.discount_percentage:
-            self.discount_amount = (self.subtotal * self.discount_percentage) / 100
-            self.total_ht = self.subtotal - self.discount_amount
-
-        if self.total_ht and self.tax_rate:
-            tax_decimal = int(self.tax_rate) / 100
-            self.tax_amount = self.total_ht * tax_decimal
-            self.total_ttc = self.total_ht + self.tax_amount
-
-        super().save(*args, **kwargs)
-
     def __str__(self):
         return f"Invoice {self.invoice_number} - {self.client.company_name}"
 
 
 class InvoiceItem(models.Model):
-    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="items")
+    invoice = models.ForeignKey(
+        Invoice, on_delete=models.CASCADE, related_name="invoice_items"
+    )
     item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True)
-
+    description = models.TextField(null=True, blank=True)
     item_code = models.CharField(max_length=50, blank=True, null=True)
     item_name = models.CharField(max_length=255)
     item_description = models.TextField(blank=True, null=True)
@@ -370,22 +361,26 @@ class InvoiceItem(models.Model):
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
     subtotal = models.DecimalField(max_digits=14, decimal_places=2)
     tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True
+    )
+    total = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
 
     class Meta:
-        ordering = ["item_code"]
+        ordering = ["id"]
 
     def save(self, *args, **kwargs):
-
-        if not self.subtotal and self.quantity and self.unit_price:
-            self.subtotal = self.quantity * self.unit_price
-
         if self.item and not self.item_name:
-            self.item_name = self.item.name
             self.item_code = self.item.code
+            self.item_name = self.item.name
             self.item_description = self.item.description
             self.unit = self.item.unit
             self.unit_price = self.item.unit_price
             self.tax_rate = self.item.tax_rate
+
+        self.subtotal = self.quantity * self.unit_price
+        self.tax_amount = self.subtotal * (self.tax_rate / Decimal("100"))
+        self.total = self.subtotal + self.tax_amount
 
         super().save(*args, **kwargs)
 
@@ -393,9 +388,6 @@ class InvoiceItem(models.Model):
 class Expense(models.Model):
     chantier = models.ForeignKey(
         Chantier, on_delete=models.CASCADE, related_name="expenses"
-    )
-    created_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, related_name="expenses"
     )
     title = models.CharField(max_length=255)
     category = models.CharField(max_length=50, choices=ExpenseCategory.choices)

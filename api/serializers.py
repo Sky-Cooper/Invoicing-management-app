@@ -10,6 +10,11 @@ from api.models import (
     Chantier,
     Employee,
     ChantierAssignment,
+    Attendance,
+    Item,
+    Invoice,
+    InvoiceItem,
+    Expense,
 )
 
 
@@ -441,3 +446,159 @@ class ChantierSerializer(serializers.ModelSerializer):
             "employees",
             "created_at",
         ]
+
+
+class AttendanceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Attendance
+        fields = "__all__"
+        read_only_fields = ["id", "created_at"]
+
+    def validate(self, attrs):
+        user = self.context["request"].user
+        chantier = attrs.get("chantier")
+
+        if user.role != UserRole.HR_ADMIN:
+            raise serializers.ValidationError("Only HR admins can mark attendance")
+
+        if not Chantier.objects.filter(id=chantier.id, responsible=user).exists():
+            raise serializers.ValidationError(
+                "You are not responsible for this chantier"
+            )
+
+        return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["employee"] = EmployeeSerializer(instance.employee).data
+        data["chantier"] = ChantierSerializer(instance.chantier).data
+        return data
+
+
+class ItemSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Item
+        fields = "__all__"
+        read_only_fields = ["id", "created_at"]
+
+
+class ExpenseSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Expense
+        fields = "__all__"
+        read_only_fields = ["id", "created_at"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["chantier"] = ChantierSerializer(instance.chantier).data
+        return data
+
+
+class InvoiceItemSerializer(serializers.ModelSerializer):
+    item_id = serializers.PrimaryKeyRelatedField(
+        queryset=Item.objects.all(), source="item", write_only=True, required=False
+    )
+
+    class Meta:
+        model = InvoiceItem
+        fields = [
+            "id",
+            "item_id",
+            "item_code",
+            "item_name",
+            "item_description",
+            "unit",
+            "quantity",
+            "unit_price",
+            "subtotal",
+            "tax_rate",
+        ]
+        read_only_fields = ["subtotal"]
+
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    invoice_items = InvoiceItemSerializer(many=True, read_only=True)
+    client_name = serializers.CharField(source="client.company_name", read_only=True)
+
+    class Meta:
+        model = Invoice
+        fields = "__all__"
+        read_only_fields = [
+            "created_by",
+            "subtotal",
+            "discount_amount",
+            "total_ht",
+            "tax_amount",
+            "total_ttc",
+            "amount_in_words",
+        ]
+
+    def validate(self, attrs):
+        user = self.context["request"].user
+        if attrs.get("client") and attrs["client"].company != user.company:
+            raise serializers.ValidationError("Client does not belong to your company.")
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        items_data = validated_data.pop("items")
+
+        invoice = Invoice.objects.create(**validated_data)
+
+        total_subtotal = 0
+        for item_data in items_data:
+
+            item_obj = InvoiceItem.objects.create(invoice=invoice, **item_data)
+            total_subtotal += item_obj.subtotal
+
+        invoice.subtotal = total_subtotal
+        invoice.save()
+
+        return invoice
+
+
+class InvoiceItemSerializer(serializers.ModelSerializer):
+    item_id = serializers.PrimaryKeyRelatedField(
+        queryset=Item.objects.all(), source="item", write_only=True, required=False
+    )
+
+    class Meta:
+        model = InvoiceItem
+        fields = [
+            "id",
+            "item_id",
+            "item_code",
+            "item_name",
+            "item_description",
+            "unit",
+            "quantity",
+            "unit_price",
+            "subtotal",
+            "tax_rate",
+        ]
+        read_only_fields = ["subtotal"]
+
+
+class InvoiceCreateSerializer(serializers.ModelSerializer):
+    items = InvoiceItemSerializer(many=True)
+
+    class Meta:
+        model = Invoice
+        fields = "__all__"
+        read_only_fields = [
+            "created_by",
+            "subtotal",
+            "discount_amount",
+            "total_ht",
+            "tax_amount",
+            "total_ttc",
+            "amount_in_words",
+        ]
+
+    def validate(self, attrs):
+        user = self.context["request"].user
+        if attrs.get("client") and attrs["client"].company != user.company:
+            raise serializers.ValidationError("Client does not belong to your company.")
+        return attrs

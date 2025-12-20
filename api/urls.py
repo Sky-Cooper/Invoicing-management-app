@@ -11,6 +11,10 @@ from .views import (
     EmployeeViewSet,
     ChantierAssignmentViewSet,
     ChantierViewSet,
+    AttendanceViewSet,
+    ItemViewSet,
+    ExpenseViewSet,
+    InvoiceCreateApiView,
 )
 
 
@@ -19,6 +23,7 @@ router.register(r"departments", DepartmentViewSet, basename="departments")
 router.register(
     r"departments-admins", DepartmentAdminViewSet, basename="departments-admins"
 )
+router.register(r"items", ItemViewSet, basename="items")
 router.register(r"clients", ClientViewSet, basename="clients")
 router.register(r"employees", EmployeeViewSet, basename="employees")
 router.register(r"chantiers", ChantierViewSet, basename="chantiers")
@@ -27,9 +32,12 @@ router.register(
     ChantierAssignmentViewSet,
     basename="chantier-assignments",
 )
+router.register(r"attendances", AttendanceViewSet, basename="attendances")
+router.register(r"expenses", ExpenseViewSet, basename="expenses")
 
 urlpatterns = [
     path("register/company-owner", CompanyOwnerRegistrationView.as_view()),
+    path("invoices", InvoiceCreateApiView.as_view()),
     path("profile", UserDetailsUpdateView.as_view(), name="user-profile"),
     path(
         "departments/admins/me",

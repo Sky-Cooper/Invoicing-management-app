@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { size: A4; margin: 1cm; }
+        body { font-family: 'Arial', sans-serif; color: #333; font-size: 12px; line-height: 1.4; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .company-logo { width: 150px; }
+        .company-info h1 { color: #1a4d80; margin: 0; font-size: 24px; }
+        .company-info p { margin: 2px 0; font-weight: bold; }
+        .invoice-title { text-align: center; background: #f2f2f2; padding: 10px; border: 1px solid #ccc; margin: 20px 0; font-size: 18px; font-weight: bold; }
+        .details-grid { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .client-box { border: 1px solid #000; padding: 10px; width: 60%; margin-left: auto; }
+        .client-box table { width: 100%; border-collapse: collapse; }
+        .client-box td { padding: 3px; vertical-align: top; }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .data-table th { background: #e6e6e6; border: 1px solid #000; padding: 8px; text-align: center; }
+        .data-table td { border: 1px solid #000; padding: 8px; }
+        .totals-wrapper { margin-top: 20px; display: flex; justify-content: flex-end; }
+        .totals-table { width: 45%; border-collapse: collapse; float: right; }
+        .totals-table td { border: 1px solid #000; padding: 6px 10px; }
+        .totals-table td:first-child { font-weight: bold; background: #f9f9f9; }
+        .footer-text { margin-top: 40px; font-style: italic; font-weight: bold; border-top: 1px solid #000; padding-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-info">
+            <h1>{{ company.name }}</h1> <p>{{ company.title|default:"VOTRE STRUCTURE NOTRE EXCELLENCE" }}</p> <p>I.C.E: {{ company.ice }}</p> </div>
+        {% if logo_path %}
+        <img src="file://{{ logo_path }}" class="company-logo">
+        {% endif %}
+    </div>
+
+    <div class="invoice-title">FACTURE N°: {{ invoice.invoice_number }}</div> <p><strong>Date: {{ invoice.issued_date|date:"d/m/Y" }}</strong></p> <div class="client-box">
+        <strong>Client</strong> <table>
+            <tr><td width="30%">Nom :</td><td>{{ invoice.client.company_name }}</td></tr> <tr><td>ICE :</td><td>{{ invoice.client.ice }}</td></tr> <tr><td>Adresse :</td><td>{{ invoice.client.address }}</td></tr> <tr><td>Objet :</td><td>{{ invoice.project_description }}</td></tr> <tr><td>Contrat N° :</td><td>{{ invoice.contract_number }}</td></tr> </table>
+    </div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th width="10%">Poste</th>
+                <th width="45%">Designation</th>
+                <th width="10%">UN</th>
+                <th width="10%">QTE</th>
+                <th width="12%">PU HT</th>
+                <th width="13%">PT HT</th>
+            </tr> </thead>
+        <tbody>
+            {% for item in invoice.invoice_items.all %}
+            <tr>
+                <td align="center">{{ item.item_code|default:forloop.counter }}</td>
+                <td>{{ item.item_name }}<br><small>{{ item.item_description|default:"" }}</small></td>
+                <td align="center">{{ item.unit }}</td>
+                <td align="center">{{ item.quantity }}</td>
+                <td align="right">{{ item.unit_price|floatformat:2 }}</td>
+                <td align="right">{{ item.subtotal|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals-wrapper">
+        <table class="totals-table">
+            <tr>
+                <td>Total HT (DH)</td>
+                <td align="right">{{ invoice.subtotal|floatformat:2 }}</td>
+            </tr> <tr>
+                <td>Réception provisoire 10% (DH)</td>
+                <td align="right">{{ invoice.discount_amount|floatformat:2 }}</td>
+            </tr> <tr>
+                <td>TOTAL HT APRES DEDUCTION (DH)</td>
+                <td align="right">{{ invoice.total_ht|floatformat:2 }}</td>
+            </tr> <tr>
+                <td>TVA {{ invoice.tax_rate|floatformat:0 }}% (DH)</td>
+                <td align="right">{{ invoice.tax_amount|floatformat:2 }}</td>
+            </tr> <tr style="font-size: 14px;">
+                <td>TOTAL TTC (DH)</td>
+                <td align="right"><strong>{{ invoice.total_ttc|floatformat:2 }}</strong></td>
+            </tr> </table>
+    </div>
+
+    <div class="footer-text">
+        Arrêtée la présente facture à la somme de: {{ invoice.amount_in_words|upper }}
+    </div> </body>
+</html>

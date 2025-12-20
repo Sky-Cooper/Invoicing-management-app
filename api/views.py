@@ -8,6 +8,11 @@ from .models import (
     Employee,
     Chantier,
     ChantierAssignment,
+    Attendance,
+    Invoice,
+    Item,
+    InvoiceItem,
+    Expense,
 )
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -21,6 +26,12 @@ from .serializers import (
     EmployeeSerializer,
     ChantierAssignmentSerializer,
     ChantierSerializer,
+    AttendanceSerializer,
+    ItemSerializer,
+    ExpenseSerializer,
+    InvoiceItemSerializer,
+    InvoiceSerializer,
+    InvoiceCreateSerializer,
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.views import APIView
@@ -28,9 +39,23 @@ from rest_framework.response import Response
 from rest_framework import status, generics, permissions
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
-from .permissions.roles import IsCompanyOrSuperAdmin
+from .permissions.roles import (
+    IsCompanyOrSuperAdmin,
+    IsCompanyOrHRAdmin,
+    CanManageInvoices,
+)
 from rest_framework.exceptions import NotFound, ValidationError, PermissionDenied
 from rest_framework import viewsets
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.template.loader import render_to_string
+from django.http import HttpResponse
+
+import tempfile
+from django.db import transaction
+from num2words import num2words
+from .tasks import generate_invoice_pdf_task
+from .services import InvoiceCalculator
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -325,3 +350,105 @@ class ChantierAssignmentViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Only admins can assign employees")
 
         serializer.save()
+
+
+class AttendanceViewSet(viewsets.ModelViewSet):
+    serializer_class = AttendanceSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrHRAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            queryset = Attendance.objects.all()
+
+        elif user.role == UserRole.COMPANY_ADMIN:
+            queryset = Attendance.objects.filter(employee__user__company=user.company)
+
+        elif user.role == UserRole.HR_ADMIN:
+            queryset = Attendance.objects.filter(chantier__responsible=user)
+
+        else:
+            return Attendance.objects.none()
+
+        date_param = self.request.query_params.get("date")
+
+        if date_param:
+            queryset = queryset.filter(date=date_param)
+
+        return queryset
+
+
+class ItemViewSet(viewsets.ModelViewSet):
+    serializer_class = ItemSerializer
+    permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.is_superuser:
+            return Item.objects.all()
+
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN]:
+            return Item.objects.filter(company=user.company)
+
+        return Item.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        serializer.save(company=user.company)
+
+
+class ExpenseViewSet(viewsets.ModelViewSet):
+    serializer_class = ExpenseSerializer
+    permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.is_superuser:
+            return Expense.objects.all()
+
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN]:
+            return Expense.objects.filter(chantier__department__company=user.company)
+
+        return Expense.objects.none()
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+
+class InvoiceCreateApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = InvoiceCreateSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        # 1. Save Basic Invoice Data
+        items_data = serializer.validated_data.pop("items")
+        invoice = serializer.save(created_by=request.user)
+
+        # 2. Create Invoice Items
+        # This allows the task to access items via invoice.invoice_items.all()
+        for item_data in items_data:
+            InvoiceItem.objects.create(invoice=invoice, **item_data)
+
+        # 3. Trigger Async Task after DB commit
+        # We pass only the ID to keep the task payload light
+        transaction.on_commit(lambda: generate_invoice_pdf_task.delay(invoice.id))
+
+        # 4. Prepare Response
+        # Note: At this exact moment, the PDF might still be generating,
+        # so we return the object data immediately.
+        data = InvoiceSerializer(invoice).data
+
+        # Provide a predictable URL where the file will eventually be
+        pdf_filename = f"facture_{invoice.invoice_number.replace('/', '_')}.pdf"
+        data["download_url"] = request.build_absolute_uri(
+            f"{settings.MEDIA_URL}invoices/{pdf_filename}"
+        )
+
+        return Response(data, status=status.HTTP_201_CREATED)
