@@ -15,10 +15,15 @@ from .views import (
     ItemViewSet,
     ExpenseViewSet,
     InvoiceCreateApiView,
+    PaymentViewSet,
+    DashboardAnalyticsView,
+    ExecutiveDashboardView,
+    AdvancedDashboardView,
 )
 
 
 router = DefaultRouter()
+router.register(r"payments", PaymentViewSet, basename="payments")
 router.register(r"departments", DepartmentViewSet, basename="departments")
 router.register(
     r"departments-admins", DepartmentAdminViewSet, basename="departments-admins"
@@ -38,6 +43,9 @@ router.register(r"expenses", ExpenseViewSet, basename="expenses")
 urlpatterns = [
     path("register/company-owner", CompanyOwnerRegistrationView.as_view()),
     path("invoices", InvoiceCreateApiView.as_view()),
+    path("dashboard/data", DashboardAnalyticsView.as_view()),
+    path("dashboard/executive", ExecutiveDashboardView.as_view()),
+    path("dashboard/advanced", AdvancedDashboardView.as_view()),
     path("profile", UserDetailsUpdateView.as_view(), name="user-profile"),
     path(
         "departments/admins/me",

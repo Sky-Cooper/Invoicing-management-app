@@ -15,7 +15,9 @@ from api.models import (
     Invoice,
     InvoiceItem,
     Expense,
+    Payment,
 )
+from django.db.models import Sum
 
 
 class CompanyOwnerRegistrationSerializer(serializers.Serializer):
@@ -601,4 +603,34 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         if attrs.get("client") and attrs["client"].company != user.company:
             raise serializers.ValidationError("Client does not belong to your company.")
+        return attrs
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+
+    payment_method_display = serializers.CharField(
+        source="get_payment_method_display", read_only=True
+    )
+
+    class Meta:
+        model = Payment
+        fields = "__all__"
+        read_only_fields = ["id", "created_at"]
+
+    def validate(self, attrs):
+        invoice = attrs.get("invoice") or self.instance.invoice
+        amount = attrs.get("amount")
+
+        total_paid = (
+            invoice.payments.exclude(pk=getattr(self.instance, "pk", None)).aggregate(
+                total=Sum("amount")
+            )["total"]
+            or 0
+        )
+
+        if total_paid + amount > invoice.total_ttc:
+            raise serializers.ValidationError(
+                {"amount": "Payment exceeds invoice total."}
+            )
+
         return attrs

@@ -410,3 +410,9 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment of {self.amount} for Invoice {self.invoice.invoice_number}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["payment_date"]),
+            models.Index(fields=["payment_method"]),
+        ]

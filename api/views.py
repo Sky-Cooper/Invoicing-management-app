@@ -13,6 +13,7 @@ from .models import (
     Item,
     InvoiceItem,
     Expense,
+    Payment,
 )
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -32,6 +33,7 @@ from .serializers import (
     InvoiceItemSerializer,
     InvoiceSerializer,
     InvoiceCreateSerializer,
+    PaymentSerializer,
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.views import APIView
@@ -56,6 +58,25 @@ from django.db import transaction
 from num2words import num2words
 from .tasks import generate_invoice_pdf_task
 from .services import InvoiceCalculator
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import permissions
+from .analytics.financials import FinancialAnalytics
+from .permissions.roles import IsCompanyOrSuperAdmin
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import permissions
+from .analytics.financials import FinancialAnalytics
+from .analytics.advanced import AdvancedAnalytics
+from .permissions.roles import IsCompanyOrSuperAdmin
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import permissions
+from .analytics.aging import AgingAnalytics
+from .analytics.labor import LaborAnalytics
+from .analytics.tax import TaxAnalytics
+from .permissions.roles import IsCompanyOrSuperAdmin
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -111,7 +132,19 @@ class CookieTokenRefreshView(TokenRefreshView):
 
         access_token = serializer.validated_data["access"]
 
-        response = Response({"access": access_token}, status=status.HTTP_200_OK)
+        try:
+            token_obj = RefreshToken(refresh_token)
+            user_id = token_obj["user_id"]
+            user = User.objects.get(id=user_id)
+
+        except Exception:
+            return Response(
+                {"detail": "Invalid refresh Token"}, status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        data = {"access_token": access_token, "role": user.role}
+
+        response = Response(data, status=status.HTTP_200_OK)
         response.set_cookie(
             key="access_token",
             value=access_token,
@@ -417,6 +450,21 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         serializer.save()
 
 
+class PaymentViewSet(viewsets.ModelViewSet):
+    serializer_class = PaymentSerializer
+    permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return Payment.objects.all()
+
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN]:
+            return Payment.objects.filter(invoice__client__company=user.company)
+
+        return Payment.objects.none()
+
+
 class InvoiceCreateApiView(APIView):
     permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
 
@@ -480,3 +528,82 @@ class InvoiceCreateApiView(APIView):
 
         serializer = InvoiceSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class DashboardAnalyticsView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+
+    def get(self, request):
+        company = request.user.company
+        if not company:
+            return Response({"error": "No company associated"}, status=400)
+
+        analytics = FinancialAnalytics(company)
+
+        data = {
+            "summary": analytics.get_kpi_summary(),
+            "revenue_trend": analytics.get_revenue_growth(),
+            "expense_by_category": analytics.get_expense_breakdown(),
+            "project_performance": analytics.get_chantier_profitability(),
+        }
+
+        return Response(data)
+
+
+class ExecutiveDashboardView(APIView):
+    """
+    The main 'One-Stop' endpoint for the Company Owner Dashboard.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+
+    def get(self, request):
+        company = request.user.company
+
+        # Initialize both service layers
+        basic_stats = FinancialAnalytics(company)
+        adv_stats = AdvancedAnalytics(company)
+
+        response_data = {
+            "kpis": basic_stats.get_kpi_summary(),
+            "cash_flow": {
+                "revenue_trend": basic_stats.get_revenue_growth(),
+                "aging_report": adv_stats.get_accounts_receivable_aging(),
+            },
+            "market_share": {
+                "top_clients": adv_stats.get_client_concentration(),
+                "expense_distribution": basic_stats.get_expense_breakdown(),
+            },
+            "project_health": basic_stats.get_chantier_profitability(),
+            "tax_compliance": adv_stats.get_tax_summary(),
+        }
+
+        return Response(response_data)
+
+
+class AdvancedDashboardView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+
+    def get(self, request):
+        company = request.user.company
+        if not company:
+            return Response({"error": "No company"}, status=400)
+
+        # Instantiate all analytics classes
+        aging = AgingAnalytics(company)
+        labor = LaborAnalytics(company)
+        tax = TaxAnalytics(company)
+
+        return Response(
+            {
+                "cash_flow_health": {
+                    "aging_report": aging.get_ar_aging_buckets(),
+                    "dso_days": aging.calculate_dso(),
+                },
+                "workforce_productivity": {
+                    "labor_metrics": labor.get_labor_intensity(),
+                    "project_efficiency": labor.get_project_efficiency(),
+                },
+                "tax_planning": tax.get_tva_forecast(),
+            }
+        )
