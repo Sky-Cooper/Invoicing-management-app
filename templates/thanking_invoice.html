@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background-color: #f8f8f8; color: #333; }
+        .wrapper { width: 100%; background-color: #f8f8f8; padding-bottom: 40px; }
+        .main-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 4px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .header { background-color: #000000; padding: 30px; text-align: center; border-bottom: 5px solid #E61E2A; }
+        .logo { width: 180px; height: auto; }
+        .slogan { color: #ffffff; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; margin-top: 10px; opacity: 0.8; }
+        .content { padding: 40px; line-height: 1.6; text-align: center; }
+        .success-icon { font-size: 48px; color: #E61E2A; margin-bottom: 20px; }
+        .title { font-size: 24px; font-weight: bold; color: #000000; margin-bottom: 10px; text-transform: uppercase; }
+        .invoice-card { background-color: #f9f9f9; border: 1px solid #eeeeee; border-radius: 8px; padding: 25px; margin: 25px 0; text-align: left; }
+        .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px dashed #ddd; padding-bottom: 5px; }
+        .label { color: #777; }
+        .value { color: #000; font-weight: bold; }
+        .thanks-msg { font-size: 16px; color: #555; margin-bottom: 30px; }
+        .footer { text-align: center; padding: 30px; font-size: 12px; color: #999; }
+        .red-accent { color: #E61E2A; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="main-container">
+            <div class="header">
+                <img src="cid:logo" alt="Tourtra Logo" class="logo">
+                <div class="slogan">Votre structure, notre excellence</div>
+            </div>
+            
+            <div class="content">
+                <div class="success-icon">✓</div>
+                <div class="title">Payment Received</div>
+                <p class="thanks-msg">Hello <strong>{{ contact_name }}</strong>, thank you for your payment. We have successfully processed your transaction for <span class="red-accent">Tourtra</span> services.</p>
+                
+                <div class="invoice-card">
+                    <div class="detail-row">
+                        <span class="label">Invoice:</span>
+                        <span class="value">#{{ invoice_number }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Amount Paid:</span>
+                        <span class="value">{{ total_ttc }} MAD</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Status:</span>
+                        <span class="value" style="color: #28a745;">PAID / RÉGLÉ</span>
+                    </div>
+                </div>
+
+                <p>Your support helps us maintain the excellence we strive for. You can download your official receipt using the link below.</p>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <a href="{{ payment_url }}" style="background-color: #000000; color: #ffffff; padding: 14px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">Download Receipt</a>
+                </div>
+            </div>
+
+            <div class="footer">
+                &copy; {{ current_year }} <strong>Tourtra</strong>. All rights reserved.<br>
+                <em>Votre structure, notre excellence</em>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

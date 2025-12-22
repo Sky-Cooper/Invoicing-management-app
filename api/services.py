@@ -8,6 +8,16 @@ from weasyprint import HTML
 
 from decimal import Decimal
 
+from django.core.mail import send_mail
+
+import os
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from email.mime.image import MIMEImage
+from django.utils import timezone
+
 
 class InvoiceGenerator:
 
@@ -95,25 +105,18 @@ class InvoiceCalculator:
 
     @staticmethod
     def get_totals(invoice):
-        """
-        Calculates totals based on the Moroccan template logic.
-        Used by the Celery task to ensure data integrity before PDF generation.
-        """
-        items = invoice.invoice_items.all()
-        subtotal = sum(i.quantity * i.unit_price for i in items)  # [cite: 8, 14, 25]
 
-        # Moroccan 10% Retention (Réception provisoire)
+        items = invoice.invoice_items.all()
+        subtotal = sum(i.quantity * i.unit_price for i in items)
+
         retention_rate = Decimal("10.0")
         discount_amount = subtotal * (retention_rate / Decimal("100"))
 
-        # HT After Deduction [cite: 18, 27]
         total_ht = subtotal - discount_amount
 
-        # TVA 20% on the remaining HT [cite: 19, 28]
         tax_rate = Decimal("20.0")
         tax_amount = total_ht * (tax_rate / Decimal("100"))
 
-        # Final TTC [cite: 20, 29]
         total_ttc = total_ht + tax_amount
 
         return {
@@ -125,3 +128,83 @@ class InvoiceCalculator:
             "tax_amount": tax_amount,
             "total_ttc": total_ttc,
         }
+
+
+class EmailSending:
+    def __init__(self, invoice):
+        self.invoice = invoice
+        self.common_context = {
+            "contact_name": self.invoice.client.contact_name,
+            "client_company": self.invoice.client.company_name,
+            "invoice_number": self.invoice.invoice_number,
+            "total_ttc": "{:,.2f}".format(self.invoice.total_ttc),
+            "due_date": (
+                self.invoice.due_date.strftime("%d/%m/%Y")
+                if self.invoice.due_date
+                else "N/A"
+            ),
+            "current_year": timezone.now().year,
+            "payment_url": f"https://tourtra-app.com/invoices/{self.invoice.id}/",
+        }
+
+    def _prepare_email(self, subject, template_name, context_update):
+        context = {**self.common_context, **context_update}
+        from_email = settings.EMAIL_HOST_USER
+        to_email = self.invoice.client.email
+
+        if not to_email:
+            return None
+
+        html_content = render_to_string(template_name, context)
+        text_content = strip_tags(html_content)
+        email = EmailMultiAlternatives(subject, text_content, from_email, [to_email])
+        email.attach_alternative(html_content, "text/html")
+        email.mixed_subtype = "related"
+
+        logo_path = os.path.join(
+            settings.BASE_DIR, "static", "assets", "companyLogo.jpg"
+        )
+        if os.path.exists(logo_path):
+            with open(logo_path, "rb") as f:
+                logo = MIMEImage(f.read())
+                logo.add_header("Content-ID", "<logo>")
+                logo.add_header(
+                    "Content-Disposition", "inline", filename="companyLogo.jpg"
+                )
+                email.attach(logo)
+
+        return email
+
+    def send_email_reminder(self, days_left=None):
+        subject = f"Reminder: Invoice #{self.invoice.invoice_number} is due soon"
+        if days_left:
+            subject = f"Action Required: {days_left} days until Invoice #{self.invoice.invoice_number} is due"
+
+        email = self._prepare_email(
+            subject, "invoice_reminder.html", {"days_left": days_left}
+        )
+        if email:
+            email.send()
+
+    def send_thanking_email(self):
+        subject = f"Receipt & Thank You: Invoice #{self.invoice.invoice_number} Paid"
+        email = self._prepare_email(subject, "thanking_invoice.html", {})
+        if email:
+            email.send()
+
+    def send_pre_due_reminder(self, days_left):
+
+        subject = f"Friendly Reminder: Invoice #{self.invoice.invoice_number} is due in {days_left} days"
+
+        context_update = {
+            "is_overdue": False,
+            "days_left": days_left,
+            "message_title": "Upcoming Payment Reminder",
+        }
+
+        email = self._prepare_email(subject, "invoice_reminder.html", context_update)
+        if email:
+            email.send()
+            print(
+                f"Pre-due reminder sent for invoice {self.invoice.invoice_number} ({days_left} days remaining)"
+            )

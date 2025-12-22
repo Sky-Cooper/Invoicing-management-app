@@ -14,6 +14,7 @@ from .models import (
     InvoiceItem,
     Expense,
     Payment,
+    InvoiceStatus,
 )
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -56,7 +57,7 @@ from django.http import HttpResponse
 import tempfile
 from django.db import transaction
 from num2words import num2words
-from .tasks import generate_invoice_pdf_task
+from .tasks import generate_invoice_pdf_task, send_thanking_invoice_task
 from .services import InvoiceCalculator
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -529,6 +530,34 @@ class InvoiceCreateApiView(APIView):
         serializer = InvoiceSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @transaction.atomic
+    def patch(self, request, pk=None):
+        try:
+            invoice = Invoice.objects.get(pk=pk)
+        except Invoice.DoesNotExist:
+            return Response(
+                {"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        old_status = invoice.status
+
+        serializer = InvoiceSerializer(
+            invoice, data=request.data, partial=True, context={"request": request}
+        )
+
+        serializer.is_valid(raise_exception=True)
+        updated_invoice = serializer.save()
+
+        if (
+            old_status != InvoiceStatus.PAID
+            and updated_invoice.status == InvoiceStatus.PAID
+        ):
+            transaction.on_commit(
+                lambda: send_thanking_invoice_task.delay(updated_invoice.id)
+            )
+
+        return Response(serializer.data)
+
 
 class DashboardAnalyticsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
@@ -551,16 +580,11 @@ class DashboardAnalyticsView(APIView):
 
 
 class ExecutiveDashboardView(APIView):
-    """
-    The main 'One-Stop' endpoint for the Company Owner Dashboard.
-    """
 
     permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
 
     def get(self, request):
         company = request.user.company
-
-        # Initialize both service layers
         basic_stats = FinancialAnalytics(company)
         adv_stats = AdvancedAnalytics(company)
 
@@ -589,7 +613,6 @@ class AdvancedDashboardView(APIView):
         if not company:
             return Response({"error": "No company"}, status=400)
 
-        # Instantiate all analytics classes
         aging = AgingAnalytics(company)
         labor = LaborAnalytics(company)
         tax = TaxAnalytics(company)

@@ -17,8 +17,17 @@ from datetime import timedelta
 
 load_dotenv()
 
+
 SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key")
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+
+
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -65,6 +74,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "phonenumber_field",
     "django_celery_results",
+    "django_celery_beat",
 ]
 
 MIDDLEWARE = [
@@ -179,6 +189,7 @@ CELERY_TASK_SERIALIZER = "json"
 
 CELERY_RESULT_BACKEND = "django-db"
 
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 CACHES = {
     "default": {
