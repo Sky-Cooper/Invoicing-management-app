@@ -416,3 +416,15 @@ class Payment(models.Model):
             models.Index(fields=["payment_date"]),
             models.Index(fields=["payment_method"]),
         ]
+
+
+class ChatMessage(models.Model):
+    user_query = models.TextField()
+    ai_response = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="chat_messages"
+    )
+
+    def __str__(self):
+        return f"Chat by {self.sent_by.get_full_name()} at {self.created_at}"

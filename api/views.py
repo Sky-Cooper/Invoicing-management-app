@@ -15,6 +15,7 @@ from .models import (
     Expense,
     Payment,
     InvoiceStatus,
+    ChatMessage,
 )
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -266,7 +267,7 @@ class ClientViewSet(viewsets.ModelViewSet):
         client = self.get_object()
         user = self.request.user
 
-        if not user.is_superuser and use.role != UserRole.COMPANY_ADMIN:
+        if not user.is_superuser and user.role != UserRole.COMPANY_ADMIN:
             raise PermissionDenied(
                 "only super admins or company admins that can modify clients"
             )
@@ -630,3 +631,70 @@ class AdvancedDashboardView(APIView):
                 "tax_planning": tax.get_tva_forecast(),
             }
         )
+
+
+# import openai
+# from django.conf import settings
+# from rest_framework.views import APIView
+# from rest_framework.response import Response
+# from rest_framework import status, permissions
+# from .models import ChatMessage
+
+# # Initialize OpenAI Client
+# client = openai.OpenAI(api_key=settings.OPENAI_KEY)
+
+
+# class OpenAiViewSet(APIView):
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     def post(self, request):
+#         user_message = request.data.get("message")
+
+#         if not user_message:
+#             return Response(
+#                 {"error": "Message is required"}, status=status.HTTP_400_BAD_REQUEST
+#             )
+
+#         try:
+#             # 1. (Optional) Fetch context
+#             # You could query the user's recent invoices here to provide context to the AI
+
+#             # 2. Call OpenAI API
+#             response = client.chat.completions.create(
+#                 model="gpt-3.5-turbo",  # or "gpt-4o"
+#                 messages=[
+#                     {
+#                         "role": "system",
+#                         "content": "You are a helpful assistant for an Invoicing and Business Management SaaS. Help the user with their business queries.",
+#                     },
+#                     {"role": "user", "content": user_message},
+#                 ],
+#                 max_tokens=500,
+#             )
+
+#             ai_content = response.choices[0].message.content
+
+#             # 3. Save to Database
+#             chat_obj = ChatMessage.objects.create(
+#                 sent_by=request.user, user_query=user_message, ai_response=ai_content
+#             )
+
+#             return Response(
+#                 {
+#                     "id": chat_obj.id,
+#                     "user_query": user_message,
+#                     "ai_response": ai_content,
+#                     "created_at": chat_obj.created_at,
+#                 },
+#                 status=status.HTTP_200_OK,
+#             )
+
+#         except openai.OpenAIError as e:
+#             return Response(
+#                 {"error": f"OpenAI Error: {str(e)}"},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             )
+#         except Exception as e:
+#             return Response(
+#                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#             )
