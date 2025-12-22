@@ -300,6 +300,31 @@ class EmployeeSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
     @transaction.atomic
+    def create(self, validated_data):
+        user_data = validated_data.pop("user")
+
+        request_user = self.context["request"].user
+
+        user = User.objects.create_user(
+            email=user_data["email"],
+            password=user_data["password"],
+            first_name=user_data["first_name"],
+            last_name=user_data["last_name"],
+            phone_number=user_data.get("phone_number"),
+            role=UserRole.EMPLOYEE,
+            preferred_language=user_data.get("preferred_language", "fr"),
+            company=request_user.company,
+            is_staff=False,
+        )
+
+        employee = Employee.objects.create(
+            user=user,
+            **validated_data
+        )
+
+        return employee
+
+    @transaction.atomic
     def update(self, instance, validated_data):
         user_data = validated_data.pop("user", None)
 

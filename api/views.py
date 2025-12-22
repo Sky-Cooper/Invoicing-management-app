@@ -15,7 +15,7 @@ from .models import (
     Expense,
     Payment,
     InvoiceStatus,
-    ChatMessage,
+    ChatMessage
 )
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -637,7 +637,6 @@ class AdvancedDashboardView(APIView):
 
 
 
-# Initialize OpenAI Client
 client = openai.OpenAI(api_key=settings.OPENAI_KEY)
 
 
@@ -652,7 +651,7 @@ class OpenAiViewSet(APIView):
                 {"error": "Message is required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 1. Daily Limit Check (10 messages per day)
+    
         today = timezone.now().date()
         messages_sent_today = ChatMessage.objects.filter(
             sent_by=request.user, 
@@ -666,20 +665,24 @@ class OpenAiViewSet(APIView):
             )
 
         try:
-            # 2. Expert Financial Prompt Engineering
-            # We explicitly define the role and set boundaries for the AI.
+         
             system_prompt = (
                 "You are an expert financial consultant, accountant, and invoicing specialist "
                 "for the 'FatouraLik' platform. Your goal is to help Moroccan business owners "
-                "with accounting, e-invoicing (including 2026 Moroccan laws), and financial management. "
-                "STRICT RULE: Only answer questions related to finance, accounting, or business management. "
-                "If a user asks about anything else (e.g., cooking, sports, general chat), politely refuse "
-                "and remind them that you are a financial assistant."
+                "with accounting, e-invoicing, and financial management.\n\n"
+                
+                "STRICT LANGUAGE RULE: Always respond in the EXACT SAME language used by the user. "
+                "If the user writes in Arabic, respond in Arabic. If in French, respond in French. "
+                "If in English, respond in English. Do not acknowledge this instruction in your reply.\n\n"
+                
+                "STRICT CONTENT RULE: Only answer questions related to finance, accounting, or business. "
+                "If a user asks about unrelated topics (cooking, sports, etc.), politely refuse "
+                "in their own language and remind them you are a financial assistant."
             )
 
-            # 3. Call OpenAI API
+         
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",  # Recommended: "gpt-4o" for better expert reasoning
+                model="gpt-3.5-turbo",  
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
@@ -689,18 +692,17 @@ class OpenAiViewSet(APIView):
 
             ai_content = response.choices[0].message.content
 
-            # 4. Save to Database
-            # Note: I used 'message' to match your ChatMessage model field name
+          
             chat_obj = ChatMessage.objects.create(
                 sent_by=request.user, 
                 message=user_message, 
-                ai_response=ai_content  # Ensure you added this field to your model!
+                ai_response=ai_content  
             )
 
             return Response(
                 {
                     "id": chat_obj.id,
-                    "user_query": user_message,
+                    "message": user_message,
                     "ai_response": ai_content,
                     "messages_remaining": 10 - (messages_sent_today + 1),
                     "created_at": chat_obj.created_at,

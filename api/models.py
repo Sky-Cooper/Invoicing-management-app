@@ -419,7 +419,7 @@ class Payment(models.Model):
 
 
 class ChatMessage(models.Model):
-    user_query = models.TextField()
+    message = models.TextField()
     ai_response = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     sent_by = models.ForeignKey(
