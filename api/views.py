@@ -79,7 +79,7 @@ from .analytics.aging import AgingAnalytics
 from .analytics.labor import LaborAnalytics
 from .analytics.tax import TaxAnalytics
 from .permissions.roles import IsCompanyOrSuperAdmin
-from timezone.utils import timezone
+from django.utils import timezone
 import openai
 
 
