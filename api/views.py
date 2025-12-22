@@ -36,6 +36,7 @@ from .serializers import (
     InvoiceSerializer,
     InvoiceCreateSerializer,
     PaymentSerializer,
+    HrAdminRetrieveDataSerializer
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.views import APIView
@@ -250,6 +251,23 @@ class DepartmentAdminRetrieveViewSet(generics.RetrieveAPIView):
         return user
 
 
+class HrAdminRetreiveDataViewSet(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+    serializer_class = HrAdminRetrieveDataSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.is_superuser:
+            return User.objects.filter(role = UserRole.HR_ADMIN)
+        
+        if user.role == UserRole.COMPANY_ADMIN:
+            return User.objects.filter(company = user.company, role = UserRole.HR_ADMIN)
+
+
+        return user.objects.none()
+
+
 class ClientViewSet(viewsets.ModelViewSet):
     serializer_class = ClientSerializer
     permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
@@ -325,6 +343,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         user = instance.user
         instance.delete()
         user.delete()
+
 
 
 class ChantierViewSet(viewsets.ModelViewSet):

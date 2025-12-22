@@ -105,6 +105,37 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 
+class HrAdminRetrieveDataSerializer(serializers.ModelSerializer):
+    role_display = serializers.CharField(source="get_role_display", read_only=True)
+    department_name = serializers.CharField(source="department.name", read_only=True)
+    company_name = serializers.CharField(source="company.name", read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number",
+            "role",
+            "role_display",
+            "profile_image",
+            "department",
+            "department_name",
+            "company",
+            "company_name",
+            "is_active",
+        ]
+
+        read_only_fields = [
+            "id",
+            "role_display",
+            "department_name",
+            "company_name",
+        ]
+
+
 class UserDataSerializer(serializers.ModelSerializer):
     role_display = serializers.CharField(source="get_role_display", read_only=True)
     department_name = serializers.CharField(source="department.name", read_only=True)
@@ -473,6 +504,8 @@ class ChantierSerializer(serializers.ModelSerializer):
             "employees",
             "created_at",
         ]
+
+
 
 
 class AttendanceSerializer(serializers.ModelSerializer):

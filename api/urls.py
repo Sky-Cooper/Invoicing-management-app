@@ -19,7 +19,8 @@ from .views import (
     DashboardAnalyticsView,
     ExecutiveDashboardView,
     AdvancedDashboardView,
-    OpenAiViewSet
+    OpenAiViewSet,
+    HrAdminRetreiveDataViewSet
 )
 
 
@@ -55,6 +56,7 @@ urlpatterns = [
         DepartmentAdminRetrieveViewSet.as_view(),
         name="department-admins",
     ),
+    path("hr-deparements/admins", HrAdminRetreiveDataViewSet.as_view(), name="hr-deparements-admins"),
     path("company/details", CompanyDetailsUpdateView.as_view(), name="company-details"),
     path("", include(router.urls)),
 ]
