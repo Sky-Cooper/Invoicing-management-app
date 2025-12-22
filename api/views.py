@@ -79,6 +79,8 @@ from .analytics.aging import AgingAnalytics
 from .analytics.labor import LaborAnalytics
 from .analytics.tax import TaxAnalytics
 from .permissions.roles import IsCompanyOrSuperAdmin
+from timezone.utils import timezone
+import openai
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -633,68 +635,85 @@ class AdvancedDashboardView(APIView):
         )
 
 
-# import openai
-# from django.conf import settings
-# from rest_framework.views import APIView
-# from rest_framework.response import Response
-# from rest_framework import status, permissions
-# from .models import ChatMessage
-
-# # Initialize OpenAI Client
-# client = openai.OpenAI(api_key=settings.OPENAI_KEY)
 
 
-# class OpenAiViewSet(APIView):
-#     permission_classes = [permissions.IsAuthenticated]
+# Initialize OpenAI Client
+client = openai.OpenAI(api_key=settings.OPENAI_KEY)
 
-#     def post(self, request):
-#         user_message = request.data.get("message")
 
-#         if not user_message:
-#             return Response(
-#                 {"error": "Message is required"}, status=status.HTTP_400_BAD_REQUEST
-#             )
+class OpenAiViewSet(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
-#         try:
-#             # 1. (Optional) Fetch context
-#             # You could query the user's recent invoices here to provide context to the AI
+    def post(self, request):
+        user_message = request.data.get("message")
 
-#             # 2. Call OpenAI API
-#             response = client.chat.completions.create(
-#                 model="gpt-3.5-turbo",  # or "gpt-4o"
-#                 messages=[
-#                     {
-#                         "role": "system",
-#                         "content": "You are a helpful assistant for an Invoicing and Business Management SaaS. Help the user with their business queries.",
-#                     },
-#                     {"role": "user", "content": user_message},
-#                 ],
-#                 max_tokens=500,
-#             )
+        if not user_message:
+            return Response(
+                {"error": "Message is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
-#             ai_content = response.choices[0].message.content
+        # 1. Daily Limit Check (10 messages per day)
+        today = timezone.now().date()
+        messages_sent_today = ChatMessage.objects.filter(
+            sent_by=request.user, 
+            created_at__date=today
+        ).count()
 
-#             # 3. Save to Database
-#             chat_obj = ChatMessage.objects.create(
-#                 sent_by=request.user, user_query=user_message, ai_response=ai_content
-#             )
+        if messages_sent_today >= 10:
+            return Response(
+                {"error": "Daily limit reached. You can send 10 messages per day."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
 
-#             return Response(
-#                 {
-#                     "id": chat_obj.id,
-#                     "user_query": user_message,
-#                     "ai_response": ai_content,
-#                     "created_at": chat_obj.created_at,
-#                 },
-#                 status=status.HTTP_200_OK,
-#             )
+        try:
+            # 2. Expert Financial Prompt Engineering
+            # We explicitly define the role and set boundaries for the AI.
+            system_prompt = (
+                "You are an expert financial consultant, accountant, and invoicing specialist "
+                "for the 'FatouraLik' platform. Your goal is to help Moroccan business owners "
+                "with accounting, e-invoicing (including 2026 Moroccan laws), and financial management. "
+                "STRICT RULE: Only answer questions related to finance, accounting, or business management. "
+                "If a user asks about anything else (e.g., cooking, sports, general chat), politely refuse "
+                "and remind them that you are a financial assistant."
+            )
 
-#         except openai.OpenAIError as e:
-#             return Response(
-#                 {"error": f"OpenAI Error: {str(e)}"},
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             )
-#         except Exception as e:
-#             return Response(
-#                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#             )
+            # 3. Call OpenAI API
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",  # Recommended: "gpt-4o" for better expert reasoning
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message},
+                ],
+                max_tokens=500,
+            )
+
+            ai_content = response.choices[0].message.content
+
+            # 4. Save to Database
+            # Note: I used 'message' to match your ChatMessage model field name
+            chat_obj = ChatMessage.objects.create(
+                sent_by=request.user, 
+                message=user_message, 
+                ai_response=ai_content  # Ensure you added this field to your model!
+            )
+
+            return Response(
+                {
+                    "id": chat_obj.id,
+                    "user_query": user_message,
+                    "ai_response": ai_content,
+                    "messages_remaining": 10 - (messages_sent_today + 1),
+                    "created_at": chat_obj.created_at,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except openai.OpenAIError as e:
+            return Response(
+                {"error": f"OpenAI Error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

@@ -19,6 +19,7 @@ from .views import (
     DashboardAnalyticsView,
     ExecutiveDashboardView,
     AdvancedDashboardView,
+    OpenAiViewSet
 )
 
 
@@ -47,6 +48,7 @@ urlpatterns = [
     path("dashboard/data", DashboardAnalyticsView.as_view()),
     path("dashboard/executive", ExecutiveDashboardView.as_view()),
     path("dashboard/advanced", AdvancedDashboardView.as_view()),
+    path("chat-ai", OpenAiViewSet.as_view()),
     path("profile", UserDetailsUpdateView.as_view(), name="user-profile"),
     path(
         "departments/admins/me",
