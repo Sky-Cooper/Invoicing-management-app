@@ -296,6 +296,7 @@ class Item(models.Model):
 
 class Invoice(models.Model):
     invoice_number = models.CharField(max_length=50, unique=True)
+    #TODO: make sure that the invoice number is generated automatically remove it from serializer 
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="invoices"
     )

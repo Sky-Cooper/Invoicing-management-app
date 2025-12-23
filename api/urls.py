@@ -20,7 +20,8 @@ from .views import (
     ExecutiveDashboardView,
     AdvancedDashboardView,
     OpenAiViewSet,
-    HrAdminRetreiveDataViewSet
+    HrAdminRetreiveDataViewSet,
+
 )
 
 

@@ -378,8 +378,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return instance
 
 
-class DepartmentAdminCreateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=8)
+class DepartmentAdminSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=8, required=False)
 
     class Meta:
         model = User
@@ -413,10 +413,11 @@ class DepartmentAdminCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request_user = self.context["request"].user
+        password = validated_data.pop('password')
 
         return User.objects.create_user(
             email=validated_data["email"],
-            password=validated_data["password"],
+            password=password,
             first_name=validated_data["first_name"],
             last_name=validated_data["last_name"],
             phone_number=validated_data["phone_number"],
@@ -425,6 +426,24 @@ class DepartmentAdminCreateSerializer(serializers.ModelSerializer):
             company=request_user.company,
             is_staff=True,
         )
+
+    def update(self, instance, validated_data):
+        request_user = self.context['request'].user
+        if not (request_user.is_superuser or request_user.role == UserRole.COMPANY_ADMIN):
+            serializers.ValidationError("You are not allowed to update admins")
+
+        password = validated_data.pop("password", None)
+
+        for attr , value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if password:
+            instance.set_password(password)
+
+
+        instance.save()
+
+        return instance
 
 
 class ClientSerializer(serializers.ModelSerializer):

@@ -24,7 +24,7 @@ from .serializers import (
     CompanyProfileSerializer,
     DepartmentSerializer,
     DepartmentAdminRetrieveSerializer,
-    DepartmentAdminCreateSerializer,
+    DepartmentAdminSerializer,
     ClientSerializer,
     EmployeeSerializer,
     ChantierAssignmentSerializer,
@@ -219,7 +219,7 @@ class CompanyDetailsUpdateView(generics.RetrieveUpdateAPIView):
 
 class DepartmentAdminViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
-    serializer_class = DepartmentAdminCreateSerializer
+    serializer_class = DepartmentAdminSerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -238,6 +238,17 @@ class DepartmentAdminViewSet(viewsets.ModelViewSet):
         return User.objects.none()
 
 
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if user.is_superuser or user.role == UserRole.COMPANY_ADMIN:
+            user.is_active = False
+            user.save()
+            return Response(status = status.HTTP_200_OK, message = "user has been deactivated")
+
+        else:
+            return Response(status = status.HTTP_401_UNAUTHORIZED, message =  "only super admin or company admin allowed to perform this resource")
+
+
 class DepartmentAdminRetrieveViewSet(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = DepartmentAdminRetrieveSerializer
@@ -249,6 +260,10 @@ class DepartmentAdminRetrieveViewSet(generics.RetrieveAPIView):
             raise PermissionDenied("only departments admin can access this endpoint")
 
         return user
+
+
+
+
 
 
 class HrAdminRetreiveDataViewSet(generics.ListAPIView):
