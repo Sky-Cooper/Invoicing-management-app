@@ -151,7 +151,7 @@ class EmployeeAdmin(admin.ModelAdmin):
     def assigned_chantiers(self, obj):
         return ", ".join(
             ca.chantier.name
-            for ca in obj.user.chantier_assignments.filter(is_active=True)
+            for ca in obj.chantier_assignments.filter(is_active=True)
         )
 
     assigned_chantiers.short_description = "Assigned Chantiers"
