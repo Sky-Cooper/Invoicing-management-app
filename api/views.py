@@ -82,106 +82,54 @@ from .analytics.tax import TaxAnalytics
 from .permissions.roles import IsCompanyOrSuperAdmin
 from django.utils import timezone
 import openai
+from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
+
+
+
+client = openai.OpenAI(api_key=settings.OPENAI_KEY)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+    # Protect login endpoint
+    throttle_scope = 'auth_limit'
+    throttle_classes = [ScopedRateThrottle]
 
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.user
-
-        refresh = RefreshToken.for_user(user)
-        access = refresh.access_token
-
-        data = serializer.validated_data
-        response = Response(data, status=200)
-
-        response.set_cookie(
-            key="refresh_token",
-            value=str(refresh),
-            httponly=True,
-            secure=not settings.DEBUG,
-            samesite="Strict",
-            max_age=settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds(),
-        )
-
-        response.set_cookie(
-            key="access_token",
-            value=str(access),
-            httponly=False,
-            secure=not settings.DEBUG,
-            samesite="Strict",
-            max_age=settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
-        )
-
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == 200:
+            refresh = response.data.get('refresh')
+            access = response.data.get('access')
+            response.set_cookie(key="refresh_token", value=refresh, httponly=True, secure=not settings.DEBUG)
+            response.set_cookie(key="access_token", value=access, httponly=False, secure=not settings.DEBUG)
         return response
-
 
 class CookieTokenRefreshView(TokenRefreshView):
-
     def post(self, request, *args, **kwargs):
         refresh_token = request.COOKIES.get("refresh_token")
-        if refresh_token is None:
-            return Response(
-                {"detail": "Refresh token not provided"},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
+        if not refresh_token:
+            return Response({"detail": "Refresh token not provided"}, status=401)
+        
         serializer = self.get_serializer(data={"refresh": refresh_token})
-        try:
-            serializer.is_valid(raise_exception=True)
-        except Exception as e:
-            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
-
+        serializer.is_valid(raise_exception=True)
         access_token = serializer.validated_data["access"]
-
-        try:
-            token_obj = RefreshToken(refresh_token)
-            user_id = token_obj["user_id"]
-            user = User.objects.get(id=user_id)
-
-        except Exception:
-            return Response(
-                {"detail": "Invalid refresh Token"}, status=status.HTTP_401_UNAUTHORIZED
-            )
-
-        data = {"access_token": access_token, "role": user.role}
-
-        response = Response(data, status=status.HTTP_200_OK)
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=False,
-            secure=not settings.DEBUG,
-            samesite="Strict",
-            max_age=settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
-        )
-
+        
+        response = Response({"access_token": access_token}, status=200)
+        response.set_cookie(key="access_token", value=access_token, httponly=False, secure=not settings.DEBUG)
         return response
-
 
 class CompanyOwnerRegistrationView(APIView):
     permission_classes = []
+    # Protect registration from bots
+    throttle_scope = 'auth_limit'
+    throttle_classes = [ScopedRateThrottle]
 
     def post(self, request):
         serializer = CompanyOwnerRegistrationSerializer(data=request.data)
-
         if serializer.is_valid():
             user = serializer.save()
-            return Response(
-                {
-                    "message": "Company owner registered successfully",
-                    "user_id": str(user.id),
-                    "company_id": str(user.company.id),
-                    "role": user.role,
-                },
-                status=status.HTTP_201_CREATED,
-            )
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            return Response({"message": "Registered successfully", "user_id": user.id}, status=201)
+        return Response(serializer.errors, status=400)
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     serializer_class = DepartmentSerializer
@@ -505,7 +453,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
 class InvoiceCreateApiView(APIView):
     permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
-
+    
     @transaction.atomic
     def post(self, request):
         serializer = InvoiceCreateSerializer(
@@ -598,7 +546,7 @@ class InvoiceCreateApiView(APIView):
 
 class DashboardAnalyticsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
-
+    throttle_classes = [UserRateThrottle]
     def get(self, request):
         company = request.user.company
         if not company:
@@ -619,7 +567,7 @@ class DashboardAnalyticsView(APIView):
 class ExecutiveDashboardView(APIView):
 
     permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
-
+    throttle_classes = [UserRateThrottle]
     def get(self, request):
         company = request.user.company
         basic_stats = FinancialAnalytics(company)
@@ -644,7 +592,7 @@ class ExecutiveDashboardView(APIView):
 
 class AdvancedDashboardView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
-
+    throttle_classes = [UserRateThrottle]
     def get(self, request):
         company = request.user.company
         if not company:
@@ -671,11 +619,13 @@ class AdvancedDashboardView(APIView):
 
 
 
-client = openai.OpenAI(api_key=settings.OPENAI_KEY)
 
 
 class OpenAiViewSet(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    
+    throttle_scope = 'financial_ai'
+    throttle_classes = [ScopedRateThrottle]
 
     def post(self, request):
         user_message = request.data.get("message")
