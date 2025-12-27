@@ -537,7 +537,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         chantier = attrs.get("chantier")
 
-        if user.role != UserRole.HR_ADMIN:
+        if user.role not in [UserRole.HR_ADMIN, UserRole.COMPANY_ADMIN] and not user.is_superuser:
             raise serializers.ValidationError("Only HR admins can mark attendance")
 
         if not Chantier.objects.filter(id=chantier.id, responsible=user).exists():
