@@ -125,12 +125,6 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ),
-    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
-}
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),  # Access token valid for 15 minutes
@@ -193,14 +187,22 @@ CACHES = {
 
 
 REST_FRAMEWORK = {
+
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
+
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle'
-    ],  
+    ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/day',        
-        'user': '1000/day',       
+        'anon': '100/day',
+        'user': '1000/day',
         'financial_ai': '10/day',
-        'auth_limit': '5/minute', 
+        'auth_limit': '5/minute',
     }
 }

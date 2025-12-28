@@ -544,6 +544,65 @@ class InvoiceCreateApiView(APIView):
         return Response(serializer.data)
 
 
+class InvoiceDetailApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
+
+    def get(self, request, pk):
+        try:
+            invoice = Invoice.objects.select_related(
+                "client", "created_by"
+            ).prefetch_related("invoice_items").get(pk=pk)
+        except Invoice.DoesNotExist:
+            return Response(
+                {"detail": "Invoice not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # permission safety
+        user = request.user
+        if not user.is_superuser and invoice.created_by.company != user.company:
+            return Response(
+                {"detail": "Not allowed"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = InvoiceSerializer(
+            invoice, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        try:
+            invoice = Invoice.objects.get(pk=pk)
+        except Invoice.DoesNotExist:
+            return Response(
+                {"detail": "Invoice not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = InvoiceSerializer(
+            invoice,
+            data=request.data,
+            partial=True,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        updated_invoice = serializer.save()
+
+        if (
+            invoice.status != InvoiceStatus.PAID
+            and updated_invoice.status == InvoiceStatus.PAID
+        ):
+            transaction.on_commit(
+                lambda: send_thanking_invoice_task.delay(updated_invoice.id)
+            )
+
+        return Response(serializer.data)
+
+
+
+
 class DashboardAnalyticsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
     throttle_classes = [UserRateThrottle]

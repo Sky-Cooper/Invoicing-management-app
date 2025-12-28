@@ -21,6 +21,7 @@ from .views import (
     AdvancedDashboardView,
     OpenAiViewSet,
     HrAdminRetreiveDataViewSet,
+    InvoiceDetailApiView
 
 )
 
@@ -46,7 +47,7 @@ router.register(r"expenses", ExpenseViewSet, basename="expenses")
 urlpatterns = [
     path("register/company-owner", CompanyOwnerRegistrationView.as_view()),
     path("invoices", InvoiceCreateApiView.as_view()),
-    path("invoices/<int:pk>/", InvoiceCreateApiView.as_view(), name="invoice-detail"),
+    path("invoices/<int:pk>/", InvoiceDetailApiView.as_view(), name="invoice-detail"),
     path("dashboard/data", DashboardAnalyticsView.as_view()),
     path("dashboard/executive", ExecutiveDashboardView.as_view()),
     path("dashboard/advanced", AdvancedDashboardView.as_view()),

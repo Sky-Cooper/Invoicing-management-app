@@ -3,21 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { size: A4; margin: 1.2cm; }
+        @page { size: A4; margin: 1.2cm; margin-bottom: 3cm; /* Added bottom margin to prevent overlap */ }
         body { font-family: 'Helvetica', 'Arial', sans-serif; color: #000; font-size: 10px; line-height: 1.4; margin: 0; padding: 0; }
         
-   
+        /* HEADER */
         .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #D32F2F; padding-bottom: 10px; }
-        .company-info h1 { margin: 0; font-size: 26px; font-weight: bold; color: #000; text-transform: uppercase; }
-        .company-info .slogan { font-size: 11px; font-weight: bold; color: #D32F2F; text-transform: uppercase; display: block; }
+        .company-info { display: flex; flex-direction: column; justify-content: center; }
+        .company-info .slogan { font-size: 14px; font-weight: bold; color: #D32F2F; text-transform: uppercase; display: block; margin-bottom: 2px; }
         .company-logo { height: 80px; object-fit: contain; }
 
-  
+        /* META & CLIENT INFO */
         .invoice-meta { margin-bottom: 20px; }
         .invoice-id { font-size: 16px; font-weight: bold; color: #000; margin-bottom: 5px; }
         .date { font-weight: bold; font-size: 11px; }
 
-      
         .client-container { display: flex; justify-content: flex-end; margin-bottom: 35px; }
         .client-box { border: 1.5px solid #000; padding: 12px; width: 60%; }
         .client-box strong { display: block; text-decoration: underline; margin-bottom: 8px; font-size: 12px; color: #D32F2F; }
@@ -25,42 +24,85 @@
         .client-table td { padding: 3px 0; vertical-align: top; }
         .client-label { font-weight: bold; width: 85px; color: #000; }
 
-      
+        /* ITEMS TABLE */
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
         .items-table th { border: 1.5px solid #000; background-color: #000; color: #FFF; padding: 8px; text-align: center; text-transform: uppercase; font-weight: bold; }
         .items-table td { border: 1px solid #000; padding: 8px; vertical-align: top; }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
 
+        /* TOTALS TABLE - Made bigger */
         .totals-container { display: flex; justify-content: flex-end; margin-top: 10px; }
-        .totals-table { width: 55%; border-collapse: collapse; }
-        .totals-table td { border: 1px solid #000; padding: 6px 10px; font-weight: bold; }
+        .totals-table { width: 60%; /* Increased width slightly */ border-collapse: collapse; }
+        .totals-table td { 
+            border: 1px solid #000; 
+            padding: 8px 10px; /* Increased padding for bigger look */
+            font-weight: bold; 
+            font-size: 11px; /* Increased font size inside table */
+        }
         .total-label { text-align: left; background-color: #f9f9f9; }
-        .total-value { text-align: right; width: 30%; }
-        .grand-total { font-size: 13px; background-color: #D32F2F !important; color: #FFF; border: 1.5px solid #000; }
+        .total-value { text-align: right; width: 35%; }
+        .grand-total { 
+            font-size: 14px; /* Larger grand total */
+            background-color: #D32F2F !important; 
+            color: #FFF; 
+            border: 1.5px solid #000; 
+        }
 
         .legal-summary { margin-top: 40px; font-weight: bold; font-style: italic; border-bottom: 1px solid #000; padding-bottom: 5px; display: inline-block; font-size: 11px; }
         
-        .page-footer { position: fixed; bottom: 0; width: 100%; text-align: center; border-top: 1.5px solid #D32F2F; padding-top: 10px; font-size: 9px; color: #000; font-weight: bold; }
+        /* FOOTER & ICE - SIGNIFICANTLY ENLARGED */
+        .page-footer { 
+            position: fixed; 
+            bottom: 0; 
+            left: 0;
+            right: 0;
+            text-align: center; 
+            border-top: 2px solid #D32F2F; 
+            padding-top: 15px; 
+            padding-bottom: 15px;
+            font-size: 11px; 
+            color: #000; 
+            background-color: #fff;
+        }
+        .footer-address { margin-bottom: 8px; font-weight: bold; }
+        
+        .footer-ice { 
+            font-size: 22px; /* VERY LARGE ICE FONT */
+            font-weight: 900; 
+            margin-top: 10px;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="company-info">
-            <h1>{{ company.name }}</h1> <span class="slogan">{{ company.title|default:"VOTRE STRUCTURE" }}</span> <span class="slogan">{{ company.subtitle|default:"NOTRE EXCELLENCE" }}</span> </div>
+            <span class="slogan">{{ company.title|default:"VOTRE STRUCTURE" }}</span> 
+            <span class="slogan">{{ company.subtitle|default:"NOTRE EXCELLENCE" }}</span> 
+        </div>
         {% if logo_path %}
         <img src="file://{{ logo_path }}" class="company-logo">
         {% endif %}
     </div>
 
     <div class="invoice-meta">
-        <div class="invoice-id">FACTURE N°: {{ invoice.invoice_number }}</div> <div class="date">Date: {{ invoice.issued_date|date:"d/m/Y" }}</div> </div>
+        <div class="invoice-id">FACTURE N°: {{ invoice.invoice_number }}</div> 
+        <div class="date">Date: {{ invoice.issued_date|date:"d/m/Y" }}</div> 
+    </div>
 
     <div class="client-container">
         <div class="client-box">
             <strong>Client</strong>
             <table class="client-table">
-                <tr><td class="client-label">Nom :</td><td>{{ invoice.client.company_name }}</td></tr> <tr><td class="client-label">ICE :</td><td>{{ invoice.client.ice }}</td></tr> <tr><td class="client-label">Adresse:</td><td>{{ invoice.client.address }}</td></tr> <tr><td class="client-label">Objet:</td><td>{{ invoice.project_description }}</td></tr> <tr><td class="client-label">Contrat N°:</td><td>{{ invoice.contract_number }}</td></tr> </table>
+                <tr><td class="client-label">Nom :</td><td>{{ invoice.client.company_name }}</td></tr> 
+                <tr><td class="client-label">ICE :</td><td>{{ invoice.client.ice }}</td></tr> 
+                <tr><td class="client-label">Adresse:</td><td>{{ invoice.client.address }}</td></tr> 
+                <tr><td class="client-label">Objet:</td><td>{{ invoice.project_description }}</td></tr> 
+                <tr><td class="client-label">Contrat N°:</td><td>{{ invoice.contract_number }}</td></tr> 
+            </table>
         </div>
     </div>
 
@@ -112,9 +154,19 @@
     </div>
 
     <div class="legal-summary">
-        Arrêtée la présente facture à la somme de: {{ invoice.amount_in_words|upper }} </div>
+        Arrêtée la présente facture à la somme de: {{ invoice.amount_in_words|upper }}
+    </div>
 
     <div class="page-footer">
-        {{ company.address|default:"HAY HASSANI DES ACTIVITES COMMERCIALES IMM N 85 APP N 6 YOUSSOFIA" }}<br> TEL: {{ company.phone|default:"+212 662-188772" }} | I.C.E: {{ company.ice|default:"003171124000097" }} </div>
+        <div class="footer-address">
+            {{ company.address|default:"HAY HASSANI DES ACTIVITES COMMERCIALES IMM N 85 APP N 6 YOUSSOFIA" }}
+        </div>
+        <div>
+            TEL: {{ company.phone|default:"+212 662-188772" }} {% if company.email %} | EMAIL: {{ company.email }} {% endif %}
+        </div>
+        <div class="footer-ice">
+            I.C.E: {{ company.ice|default:"003171124000097" }}
+        </div>
+    </div>
 </body>
 </html>

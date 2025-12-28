@@ -239,6 +239,7 @@ class Chantier(models.Model):
         related_name="responsible_chantiers",
         limit_choices_to={"role": UserRole.HR_ADMIN},
     )
+    image = models.ImageField(upload_to = "chantiers/", null = True, blank = True)
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -249,7 +250,7 @@ class Chantier(models.Model):
 
     @property
     def status(self):
-        """Calculate project status based on dates"""
+     
         from django.utils import timezone
 
         today = timezone.now().date()
@@ -296,7 +297,6 @@ class Item(models.Model):
 
 class Invoice(models.Model):
     invoice_number = models.CharField(max_length=50, unique=True)
-    #TODO: make sure that the invoice number is generated automatically remove it from serializer 
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="invoices"
     )
@@ -333,6 +333,7 @@ class Invoice(models.Model):
 
     project_description = models.TextField(blank=True, null=True)
     contract_number = models.CharField(max_length=100, blank=True, null=True)
+
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -394,6 +395,7 @@ class Expense(models.Model):
     category = models.CharField(max_length=50, choices=ExpenseCategory.choices)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     description = models.TextField(blank=True, null=True)
+    image = models.ImageField(upload_to = "expenses/", null = True, blank = True)
     expense_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
 

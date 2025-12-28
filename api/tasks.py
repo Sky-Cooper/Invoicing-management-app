@@ -69,6 +69,8 @@ def generate_invoice_pdf_task(self, invoice_id):
 
         HTML(string=html_string, base_url=settings.BASE_DIR).write_pdf(pdf_path)
 
+   
+
         return f"Invoice {invoice.invoice_number} successfully generated."
 
     except Invoice.DoesNotExist:

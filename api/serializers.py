@@ -18,6 +18,7 @@ from api.models import (
     Payment,
 )
 from django.db.models import Sum
+from django.conf import settings
 
 
 class CompanyOwnerRegistrationSerializer(serializers.Serializer):
@@ -513,6 +514,7 @@ class ChantierSerializer(serializers.ModelSerializer):
             "location",
             "description",
             "contract_number",
+            "image",
             "contract_date",
             "department",
             "client",
@@ -598,6 +600,7 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
+    download_url = serializers.SerializerMethodField()
     invoice_items = InvoiceItemSerializer(many=True, read_only=True)
     client_name = serializers.CharField(source="client.company_name", read_only=True)
 
@@ -619,6 +622,21 @@ class InvoiceSerializer(serializers.ModelSerializer):
         if attrs.get("client") and attrs["client"].company != user.company:
             raise serializers.ValidationError("Client does not belong to your company.")
         return attrs
+        
+    def get_download_url(self, obj):
+        request = self.context.get("request")
+
+        if not obj.invoice_number:
+            return None
+
+        filename = f"facture_{obj.invoice_number.replace('/', '_')}.pdf"
+
+        if request:
+            return request.build_absolute_uri(
+                f"{settings.MEDIA_URL}invoices/{filename}"
+            )
+
+        return f"{settings.MEDIA_URL}invoices/{filename}"
 
     @transaction.atomic
     def create(self, validated_data):
@@ -670,6 +688,7 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
             "created_by",
             "subtotal",
             "discount_amount",
+            "download_url",
             "total_ht",
             "tax_amount",
             "total_ttc",
