@@ -182,31 +182,6 @@ class Employee(models.Model):
     def __str__(self):
         return f"{self.user.get_full_name() if self.user else {self.id }}"
 
-
-class ChantierAssignment(models.Model):
-    employee = models.ForeignKey(
-        Employee,
-        on_delete=models.CASCADE,
-        related_name="chantier_assignments",
-    )
-    chantier = models.ForeignKey(
-        "Chantier", on_delete=models.CASCADE, related_name="employee_assignments"
-    )
-    description = models.CharField(max_length=128, blank=True, null=True)
-    start_date = models.DateField(null=True, blank=True)
-    end_date = models.DateField(null=True, blank=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True, null=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ("employee", "chantier")
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"{self.employee.user.get_full_name()} -> {self.chantier.name}"
-
-
 class Chantier(models.Model):
     name = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
@@ -261,6 +236,32 @@ class Chantier(models.Model):
             return "COMPLETED"
         else:
             return "IN_PROGRESS"
+
+
+class ChantierAssignment(models.Model):
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="chantier_assignments",
+    )
+    chantier = models.ForeignKey(
+        Chantier, on_delete=models.CASCADE, related_name="employee_assignments"
+    )
+    description = models.CharField(max_length=128, blank=True, null=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("employee", "chantier")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.employee.user.get_full_name()} -> {self.chantier.name}"
+
+
 
 
 class Attendance(models.Model):

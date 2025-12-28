@@ -39,7 +39,8 @@ class IsEmployee(BasePermission):
 
 class IsCompanyOrHRAdmin(BasePermission):
     def has_permission(self, request, view):
-        return request.user.role in {
+        user = request.user
+        return user.is_superuser or request.user.role in {
             UserRole.COMPANY_ADMIN,
             UserRole.HR_ADMIN,
         }

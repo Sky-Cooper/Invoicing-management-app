@@ -465,9 +465,27 @@ class ClientSerializer(serializers.ModelSerializer):
 
         return super().create(validated_data)
 
+class ChantierMiniSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(source="department.name", read_only=True)
+
+    class Meta:
+        model = Chantier
+        fields = [
+            "id",
+            "name",
+            "location",
+            "department",
+            "department_name",
+            "start_date",
+            "end_date",
+        ]
+
+
+
 
 class ChantierAssignmentSerializer(serializers.ModelSerializer):
     employee = EmployeeSerializer(read_only=True)
+    chantier = ChantierMiniSerializer(read_only = True)
     employee_id = serializers.PrimaryKeyRelatedField(
         queryset=Employee.objects.all(),
         source="employee",
@@ -485,6 +503,7 @@ class ChantierAssignmentSerializer(serializers.ModelSerializer):
             "id",
             "employee",
             "employee_id",
+            "chantier",
             "chantier_id",
             "description",
             "start_date",
@@ -492,6 +511,23 @@ class ChantierAssignmentSerializer(serializers.ModelSerializer):
             "is_active",
         ]
 
+    def validate(self, attrs):
+        employee = attrs.get("employee")
+        chantier = attrs.get("chantier")
+
+        if ChantierAssignment.objects.filter(
+            employee=employee,
+            chantier=chantier
+        ).exists():
+            raise serializers.ValidationError(
+                {
+                    "non_field_errors": [
+                        "This employee is already assigned to this chantier."
+                    ]
+                }
+            )
+
+        return attrs
 
 class ChantierSerializer(serializers.ModelSerializer):
     responsible = DepartmentAdminRetrieveSerializer(read_only=True)

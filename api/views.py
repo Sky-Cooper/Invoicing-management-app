@@ -280,7 +280,7 @@ class ClientViewSet(viewsets.ModelViewSet):
 
 class EmployeeViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeeSerializer
-    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrHRAdmin]
 
     def get_queryset(self):
         user = self.request.user
@@ -288,7 +288,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return Employee.objects.all()
 
-        if user.role == UserRole.COMPANY_ADMIN:
+        if user.role in {UserRole.COMPANY_ADMIN , UserRole.HR_ADMIN}:
             return Employee.objects.filter(user__company=user.company)
 
         return Employee.objects.none()
@@ -311,7 +311,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
 class ChantierViewSet(viewsets.ModelViewSet):
     serializer_class = ChantierSerializer
-    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrHRAdmin]
 
     def get_queryset(self):
         user = self.request.user
@@ -323,8 +323,11 @@ class ChantierViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return qs
 
-        if user.role in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
+        if user.role == UserRole.COMPANY_ADMIN:
             return qs.filter(department__company=user.company)
+
+        if user.role == UserRole.HR_ADMIN:
+            return qs.filter(responsible = user)
 
         if user.role == UserRole.EMPLOYEE:
             return qs.filter(employee_assignments__employee__user=user).distinct()
