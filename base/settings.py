@@ -204,5 +204,6 @@ REST_FRAMEWORK = {
         'user': '1000/day',
         'financial_ai': '10/day',
         'auth_limit': '5/minute',
-    }
+    },
+    
 }

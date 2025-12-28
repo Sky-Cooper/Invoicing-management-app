@@ -188,14 +188,16 @@ class DepartmentAdminViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         user = self.request.user
+
         if user.is_superuser or user.role == UserRole.COMPANY_ADMIN:
-            user.is_active = False
-            user.save()
-            return Response(status = status.HTTP_200_OK, message = "user has been deactivated")
+            instance.is_active = False
+            instance.save()
 
-        else:
-            return Response(status = status.HTTP_401_UNAUTHORIZED, message =  "only super admin or company admin allowed to perform this resource")
+            return 
 
+        raise PermissionDenied(
+            "Only super admin or company admin is allowed to perform this action."
+        )
 
 class DepartmentAdminRetrieveViewSet(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
