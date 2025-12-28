@@ -542,10 +542,15 @@ class AttendanceSerializer(serializers.ModelSerializer):
         if user.role not in [UserRole.HR_ADMIN, UserRole.COMPANY_ADMIN] and not user.is_superuser:
             raise serializers.ValidationError("Only HR admins can mark attendance")
 
-        if not Chantier.objects.filter(id=chantier.id, responsible=user).exists():
-            raise serializers.ValidationError(
-                "You are not responsible for this chantier"
-            )
+        if user.role == UserRole.HR_ADMIN:
+            if not Chantier.responsible == user:
+                raise serializers.ValidationError(
+                    "You are not responsible for this chantier"
+                )
+
+        if user.role == UserRole.COMPANY_ADMIN:
+            if chantier.department.company != user.company:
+                raise serializers.ValidationError("This chantier belongs to a different company")
 
         return attrs
 
