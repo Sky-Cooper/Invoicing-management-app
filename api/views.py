@@ -83,7 +83,7 @@ from .permissions.roles import IsCompanyOrSuperAdmin
 from django.utils import timezone
 import openai
 from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
-
+from rest_framework.parsers import MultiPartParser, FormParser
 
 
 client = openai.OpenAI(api_key=settings.OPENAI_KEY)
@@ -314,7 +314,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 class ChantierViewSet(viewsets.ModelViewSet):
     serializer_class = ChantierSerializer
     permission_classes = [permissions.IsAuthenticated, IsCompanyOrHRAdmin]
-
+    parser_classes = [MultiPartParser, FormParser]
     def get_queryset(self):
         user = self.request.user
 
@@ -425,7 +425,7 @@ class ItemViewSet(viewsets.ModelViewSet):
 class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
     permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
-
+    parser_classes = [MultiPartParser, FormParser]
     def get_queryset(self):
         user = self.request.user
 

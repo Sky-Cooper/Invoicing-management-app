@@ -542,6 +542,7 @@ class ChantierSerializer(serializers.ModelSerializer):
         source="employee_assignments", many=True, read_only=True
     )
 
+
     class Meta:
         model = Chantier
         fields = [
@@ -568,7 +569,21 @@ class ChantierSerializer(serializers.ModelSerializer):
 class AttendanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attendance
-        fields = "__all__"
+        fields = [
+                "id",
+                "name",
+                "location",
+                "description",
+                "contract_number",
+                "contract_date",
+                "client",
+                "department",
+                "responsible",
+                "image",  
+                "start_date",
+                "end_date",
+            ]
+
         read_only_fields = ["id", "created_at"]
 
     def validate(self, attrs):
