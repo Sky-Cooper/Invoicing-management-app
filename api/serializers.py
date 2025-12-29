@@ -579,7 +579,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Only HR admins can mark attendance")
 
         if user.role == UserRole.HR_ADMIN:
-            if not Chantier.responsible == user:
+            if not chantier.responsible == user:
                 raise serializers.ValidationError(
                     "You are not responsible for this chantier"
                 )
