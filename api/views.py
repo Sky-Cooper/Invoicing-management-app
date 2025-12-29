@@ -331,6 +331,7 @@ class ChantierViewSet(viewsets.ModelViewSet):
         if user.role == UserRole.HR_ADMIN:
             return qs.filter(responsible = user)
 
+
         if user.role == UserRole.EMPLOYEE:
             return qs.filter(employee_assignments__employee__user=user).distinct()
 
@@ -424,7 +425,7 @@ class ItemViewSet(viewsets.ModelViewSet):
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
-    permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
+    permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
     def get_queryset(self):
         user = self.request.user
@@ -432,7 +433,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return Expense.objects.all()
 
-        if user.role in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN]:
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN, UserRole.HR_ADMIN]:
             return Expense.objects.filter(chantier__department__company=user.company)
 
         return Expense.objects.none()
