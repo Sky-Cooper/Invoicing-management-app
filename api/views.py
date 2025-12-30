@@ -17,6 +17,7 @@ from .models import (
     InvoiceStatus,
     ChatMessage
 )
+from .models import Quote, QuoteItem, PurchaseOrder, POItem
 from .serializers import (
     CustomTokenObtainPairSerializer,
     CompanyOwnerRegistrationSerializer,
@@ -36,7 +37,15 @@ from .serializers import (
     InvoiceSerializer,
     InvoiceCreateSerializer,
     PaymentSerializer,
-    HrAdminRetrieveDataSerializer
+    HrAdminRetrieveDataSerializer,
+    EmployeeEOSBSerializer,
+    EmployeeWorkingContractSerializer,
+    QuoteCreateSerializer,
+    POCreateSerializer,
+    POSerializer,
+    POItemSerializer,
+    QuoteSerializer,
+    QuoteItemSerializer
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.views import APIView
@@ -59,7 +68,7 @@ from django.http import HttpResponse
 import tempfile
 from django.db import transaction
 from num2words import num2words
-from .tasks import generate_invoice_pdf_task, send_thanking_invoice_task
+from .tasks import generate_invoice_pdf_task, send_thanking_invoice_task,generate_po_pdf_task, generate_quote_pdf_task
 from .services import InvoiceCalculator
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -84,6 +93,10 @@ from django.utils import timezone
 import openai
 from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 from rest_framework.parsers import MultiPartParser, FormParser
+from num2words import num2words
+import os
+from decimal import Decimal
+from django.db import transaction
 
 
 client = openai.OpenAI(api_key=settings.OPENAI_KEY)
@@ -91,7 +104,7 @@ client = openai.OpenAI(api_key=settings.OPENAI_KEY)
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
-    # Protect login endpoint
+ 
     throttle_scope = 'auth_limit'
     throttle_classes = [ScopedRateThrottle]
 
@@ -311,16 +324,55 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
 
 
+class EmployeeEOSBViewSet(viewsets.ModelViewSet):
+    serializer_class = EmployeeEOSBSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.is_superuser:
+            return EmployeeEOSB.objects.all()
+
+        if user.role == UserRole.COMPANY_ADMIN:
+            return EmployeeEOSB.objects.filter(employee__user__company = user.company)
+
+        return EmployeeEOSB.objects.none()
+      
+
+
+class EmployeeWorkingContractViewSet(viewsets.ModelViewSet):
+    serializer_class = EmployeeWorkingContractSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get_queryset(self):
+        user = self.requets.user
+
+        if user.is_superuser:
+            return EmployeeWorkingContract.objects.all()
+        
+        if user.role == UserRole.COMPANY_ADMIN:
+            return EmployeeWorkingContract.objects.filter(employee__user__company = user.company)
+
+        return EmployeeWorkingContract.objects.none()
+
+
 class ChantierViewSet(viewsets.ModelViewSet):
     serializer_class = ChantierSerializer
     permission_classes = [permissions.IsAuthenticated, IsCompanyOrHRAdmin]
     parser_classes = [MultiPartParser, FormParser]
+
     def get_queryset(self):
         user = self.request.user
 
         qs = Chantier.objects.select_related(
-            "department", "client", "responsible"
-        ).prefetch_related("employee_assignments__employee__user")
+            "department", "client"
+        ).prefetch_related(
+            "employee_assignments__employee__user", 
+            "responsible" 
+        )
 
         if user.is_superuser:
             return qs
@@ -329,8 +381,7 @@ class ChantierViewSet(viewsets.ModelViewSet):
             return qs.filter(department__company=user.company)
 
         if user.role == UserRole.HR_ADMIN:
-            return qs.filter(responsible = user)
-
+            return qs.filter(responsible=user)
 
         if user.role == UserRole.EMPLOYEE:
             return qs.filter(employee_assignments__employee__user=user).distinct()
@@ -339,10 +390,8 @@ class ChantierViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-
         if user.role not in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
             raise PermissionDenied("Only admins can create chantiers")
-
         serializer.save()
 
 
@@ -433,8 +482,11 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return Expense.objects.all()
 
-        if user.role in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN, UserRole.HR_ADMIN]:
+        if user.role == UserRole.COMPANY_ADMIN: 
             return Expense.objects.filter(chantier__department__company=user.company)
+
+        if user.role  in [UserRole.INVOICING_ADMIN, UserRole.HR_ADMIN]:
+            return Expense.objects.filter(created_by = user)
 
         return Expense.objects.none()
 
@@ -459,6 +511,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
 class InvoiceCreateApiView(APIView):
     permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
+
     
     @transaction.atomic
     def post(self, request):
@@ -470,10 +523,42 @@ class InvoiceCreateApiView(APIView):
         items_data = serializer.validated_data.pop("items")
         invoice = serializer.save(created_by=request.user)
 
+        # 1. Create Items
         for item_data in items_data:
             InvoiceItem.objects.create(invoice=invoice, **item_data)
 
+        # 2. Calculate Totals Synchronously (So API response is correct)
+        totals = InvoiceCalculator.get_totals(invoice)
+        
+        invoice.subtotal = totals["subtotal"]
+        invoice.discount_percentage = totals["discount_percentage"]
+        invoice.discount_amount = totals["discount_amount"]
+        invoice.total_ht = totals["total_ht"]
+        invoice.tax_rate = totals["tax_rate"]
+        invoice.tax_amount = totals["tax_amount"]
+        invoice.total_ttc = totals["total_ttc"]
+        invoice.remaining_balance = totals["total_ttc"]
+
+        # 3. Calculate Amount in Words
+        ttc_value = invoice.total_ttc
+        dirhams = int(ttc_value)
+        centimes = int(round((ttc_value - dirhams) * 100))
+        dirhams_words = num2words(dirhams, lang="fr")
+
+        if centimes > 0:
+            legal_text = f"{dirhams_words} Dirhams Et {centimes} Cts TTC"
+        else:
+            legal_text = f"{dirhams_words} Dirhams TTC"
+
+        invoice.amount_in_words = legal_text.upper()
+        
+        # Save calculated values to DB
+        invoice.save()
+
+        # 4. Trigger PDF Generation Task (Background)
         transaction.on_commit(lambda: generate_invoice_pdf_task.delay(invoice.id))
+        
+        # 5. Return Response with Calculated Data
         data = InvoiceSerializer(invoice).data
 
         pdf_filename = f"facture_{invoice.invoice_number.replace('/', '_')}.pdf"
@@ -768,3 +853,120 @@ class OpenAiViewSet(APIView):
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+
+
+
+
+class QuoteCreateApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageInvoices] 
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = QuoteCreateSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        
+        items_data = serializer.validated_data.pop("items")
+        quote = serializer.save(created_by=request.user)
+ 
+        subtotal = 0
+        for item_data in items_data:
+            item = QuoteItem.objects.create(quote=quote, **item_data)
+            subtotal += item.subtotal
+
+
+        retention_rate = Decimal("10.0")
+        discount_amount = subtotal * (retention_rate / Decimal("100"))
+        total_ht = subtotal - discount_amount
+        tax_rate = Decimal("20.0")
+        tax_amount = total_ht * (tax_rate / Decimal("100"))
+        total_ttc = total_ht + tax_amount
+        
+ 
+        quote.subtotal = subtotal
+        quote.discount_percentage = retention_rate
+        quote.discount_amount = discount_amount
+        quote.total_ht = total_ht
+        quote.tax_rate = tax_rate
+        quote.tax_amount = tax_amount
+        quote.total_ttc = total_ttc
+        
+
+        dirhams = int(total_ttc)
+        centimes = int(round((total_ttc - dirhams) * 100))
+        dirhams_words = num2words(dirhams, lang="fr")
+        if centimes > 0:
+            legal_text = f"{dirhams_words} Dirhams Et {centimes} Cts TTC"
+        else:
+            legal_text = f"{dirhams_words} Dirhams TTC"
+        quote.amount_in_words = legal_text.upper()
+        
+        quote.save()
+        
+
+        transaction.on_commit(lambda: generate_quote_pdf_task.delay(quote.id))
+        
+        return Response(QuoteSerializer(quote).data, status=status.HTTP_201_CREATED)
+
+    def get(self, request):
+        user = request.user
+        qs = Quote.objects.filter(created_by__company=user.company).order_by('-created_at')
+        return Response(QuoteSerializer(qs, many=True).data)
+
+class POCreateApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = POCreateSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        
+        items_data = serializer.validated_data.pop("items")
+        po = serializer.save(created_by=request.user)
+        
+        subtotal = 0
+        for item_data in items_data:
+            item = POItem.objects.create(purchase_order=po, **item_data)
+            subtotal += item.subtotal
+            
+     
+        retention_rate = Decimal("10.0")
+        discount_amount = subtotal * (retention_rate / Decimal("100"))
+        total_ht = subtotal - discount_amount
+        tax_rate = Decimal("20.0")
+        tax_amount = total_ht * (tax_rate / Decimal("100"))
+        total_ttc = total_ht + tax_amount
+        
+ 
+        po.subtotal = subtotal
+        po.discount_percentage = retention_rate
+        po.discount_amount = discount_amount
+        po.total_ht = total_ht
+        po.tax_rate = tax_rate
+        po.tax_amount = tax_amount
+        po.total_ttc = total_ttc
+        
+
+        dirhams = int(total_ttc)
+        centimes = int(round((total_ttc - dirhams) * 100))
+        dirhams_words = num2words(dirhams, lang="fr")
+        if centimes > 0:
+            legal_text = f"{dirhams_words} Dirhams Et {centimes} Cts TTC"
+        else:
+            legal_text = f"{dirhams_words} Dirhams TTC"
+        po.amount_in_words = legal_text.upper()
+        
+        po.save()
+        
+        transaction.on_commit(lambda: generate_po_pdf_task.delay(po.id))
+        
+        return Response(POSerializer(po).data, status=status.HTTP_201_CREATED)
+
+    def get(self, request):
+        user = request.user
+        qs = PurchaseOrder.objects.filter(created_by__company=user.company).order_by('-created_at')
+        return Response(POSerializer(qs, many=True).data)
+
+
+

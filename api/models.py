@@ -27,6 +27,7 @@ class InvoiceStatus(models.TextChoices):
     DRAFT = "DRAFT", "Draft"
     COMPLETED = "COMPLETED", "Completed"
     PAID = "PAID", "Paid"
+    PARTIALLY_PAID = "PARTIALLY_PAID", "Partially paid"
 
 
 class ExpenseCategory(models.TextChoices):
@@ -176,11 +177,86 @@ class Employee(models.Model):
         User, on_delete=models.SET_NULL, null=True, related_name="employee_profile"
     )
     hire_date = models.DateField(null=True, blank=True)
-
+    is_currently_working = models.BooleanField(default = True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.user.get_full_name() if self.user else {self.id }}"
+
+
+
+
+
+
+
+class EmployeeWorkingContract(models.Model):
+    employee = models.OneToOneField(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name='working_contract'
+    )
+
+
+    contract_number = models.CharField(max_length=100, unique=True)
+    contract_start_date = models.DateField()
+    contract_end_date = models.DateField(null=True, blank=True)
+    job_title = models.CharField(max_length=150) 
+    salary = models.DecimalField(max_digits=12, decimal_places=2)
+    bonus = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    allowances = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    contract_pdf = models.FileField(
+        upload_to='contracts/',
+        null=True,
+        blank=True
+    )
+
+    notes = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.employee} - {self.contract_number}"
+
+
+
+class EmployeeEOSB(models.Model):
+    employee = models.OneToOneField(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name='eosb_record'
+    )
+
+
+    last_job_title = models.CharField(max_length=150)
+    last_salary = models.DecimalField(max_digits=12, decimal_places=2)
+    hire_date = models.DateField()
+    exit_date = models.DateField()
+
+
+    total_years_of_service = models.DecimalField(max_digits=5, decimal_places=2) 
+    basic_end_of_service_payment = models.DecimalField(max_digits=12, decimal_places=2)
+    bonuses_paid = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    deductions = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    net_payment = models.DecimalField(max_digits=12, decimal_places=2)
+
+
+    eosb_pdf = models.FileField(
+        upload_to='eosb_statements/',
+        null=True,
+        blank=True
+    )
+
+    notes = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"EOSB - {self.employee} ({self.exit_date})"
+
+
 
 class Chantier(models.Model):
     name = models.CharField(max_length=255)
@@ -207,14 +283,18 @@ class Chantier(models.Model):
         related_name="chantiers",
     )
 
-    responsible = models.ForeignKey(
+    responsible = models.ManyToManyField(
         User,
-        on_delete=models.SET_NULL,
-        null=True,
+        blank = True,
         related_name="responsible_chantiers",
         limit_choices_to={"role": UserRole.HR_ADMIN},
     )
-    image = models.ImageField(upload_to = "chantiers/", null = True, blank = True)
+    document = models.FileField(
+        upload_to="chantiers/",
+        null=True,
+        blank=True
+    )
+
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -320,7 +400,7 @@ class Invoice(models.Model):
 
     tax_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     total_ttc = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-
+    remaining_balance = models.DecimalField(max_digits = 14, decimal_places = 2, null = True, blank = True)
     amount_in_words = models.TextField(blank=True, null=True)
 
     issued_date = models.DateField()
@@ -396,9 +476,15 @@ class Expense(models.Model):
     category = models.CharField(max_length=50, choices=ExpenseCategory.choices)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     description = models.TextField(blank=True, null=True)
-    image = models.ImageField(upload_to = "expenses/", null = True, blank = True)
+    document = models.FileField(
+    upload_to="expenses/",
+    null=True,
+    blank=True
+)
+
     expense_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null = True, related_name = "expenses")
 
 
 class Payment(models.Model):
@@ -432,3 +518,126 @@ class ChatMessage(models.Model):
 
     def __str__(self):
         return f"Chat by {self.sent_by.get_full_name()} at {self.created_at}"
+
+
+
+
+
+class QuoteStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    SENT = "SENT", "Sent"
+    ACCEPTED = "ACCEPTED", "Accepted"
+    REJECTED = "REJECTED", "Rejected"
+    EXPIRED = "EXPIRED", "Expired"
+
+class POStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    SENT = "SENT", "Sent"
+    CONFIRMED = "CONFIRMED", "Confirmed"
+    COMPLETED = "COMPLETED", "Completed"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class Quote(models.Model):
+    quote_number = models.CharField(max_length=50, unique=True)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="quotes")
+    chantier = models.ForeignKey(Chantier, on_delete=models.SET_NULL, null=True, blank=True, related_name="quotes")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="created_quotes")
+    
+    status = models.CharField(max_length=20, choices=QuoteStatus.choices, default=QuoteStatus.DRAFT)
+    
+
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_ht = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_ttc = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    amount_in_words = models.TextField(blank=True, null=True)
+
+    issued_date = models.DateField()
+    valid_until = models.DateField(null=True, blank=True)
+    project_description = models.TextField(blank=True, null=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Devis {self.quote_number}"
+
+class QuoteItem(models.Model):
+    quote = models.ForeignKey(Quote, related_name='items', on_delete=models.CASCADE)
+    item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True)
+    item_code = models.CharField(max_length=50, blank=True, null=True)
+    item_name = models.CharField(max_length=255)
+    item_description = models.TextField(blank=True, null=True)
+    unit = models.CharField(max_length=50)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2)
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    
+    def save(self, *args, **kwargs):
+     
+        if self.item and not self.item_name:
+            self.item_code = self.item.code
+            self.item_name = self.item.name
+            self.item_description = self.item.description
+            self.unit = self.item.unit
+            self.unit_price = self.item.unit_price
+            self.tax_rate = self.item.tax_rate
+            
+        self.subtotal = self.quantity * self.unit_price
+        super().save(*args, **kwargs)
+
+class PurchaseOrder(models.Model):
+    po_number = models.CharField(max_length=50, unique=True)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="purchase_orders")
+    chantier = models.ForeignKey(Chantier, on_delete=models.SET_NULL, null=True, blank=True, related_name="purchase_orders")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="created_pos")
+    
+    status = models.CharField(max_length=20, choices=POStatus.choices, default=POStatus.DRAFT)
+
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_ht = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_ttc = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    amount_in_words = models.TextField(blank=True, null=True)
+
+    issued_date = models.DateField()
+    expected_delivery_date = models.DateField(null=True, blank=True)
+    project_description = models.TextField(blank=True, null=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"BC {self.po_number}"
+
+class POItem(models.Model):
+    purchase_order = models.ForeignKey(PurchaseOrder, related_name='items', on_delete=models.CASCADE)
+    item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True)
+    item_code = models.CharField(max_length=50, blank=True, null=True)
+    item_name = models.CharField(max_length=255)
+    item_description = models.TextField(blank=True, null=True)
+    unit = models.CharField(max_length=50)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2)
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
+    def save(self, *args, **kwargs):
+        if self.item and not self.item_name:
+            self.item_code = self.item.code
+            self.item_name = self.item.name
+            self.item_description = self.item.description
+            self.unit = self.item.unit
+            self.unit_price = self.item.unit_price
+            self.tax_rate = self.item.tax_rate
+            
+        self.subtotal = self.quantity * self.unit_price
+        super().save(*args, **kwargs)

@@ -15,8 +15,115 @@ from .models import (
     InvoiceItem,
     Expense,
     Payment,
+    Quote, 
+    QuoteItem,
+    POItem,  
+    PurchaseOrder, 
+    QuoteStatus, 
+    POStatus
 )
 
+
+
+class QuoteItemInline(admin.TabularInline):
+    model = QuoteItem
+    extra = 0  # Does not show empty extra rows by default
+    fields = ("item", "item_name", "quantity", "unit_price", "subtotal")
+    readonly_fields = ("subtotal",)  # Subtotal is calculated, so keep it read-only
+
+
+class POItemInline(admin.TabularInline):
+    model = POItem
+    extra = 0
+    fields = ("item", "item_name", "quantity", "unit_price", "subtotal")
+    readonly_fields = ("subtotal",)
+
+
+# --- MAIN ADMIN MODELS ---
+
+@admin.register(Quote)
+class QuoteAdmin(admin.ModelAdmin):
+    list_display = (
+        "quote_number",
+        "client",
+        "chantier",
+        "status",
+        "total_ttc",
+        "issued_date",
+        "valid_until",
+    )
+    list_filter = ("status", "issued_date", "client")
+    search_fields = ("quote_number", "client__company_name", "chantier__name")
+    
+    # Organize the detail view nicely
+    fieldsets = (
+        ("General Info", {
+            "fields": ("quote_number", "status", "client", "chantier", "created_by")
+        }),
+        ("Dates", {
+            "fields": ("issued_date", "valid_until")
+        }),
+        ("Financials", {
+            "fields": (
+                "subtotal", "discount_percentage", "discount_amount", 
+                "total_ht", "tax_rate", "tax_amount", "total_ttc", 
+                "amount_in_words"
+            )
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at")
+        }),
+    )
+    
+    readonly_fields = (
+        "subtotal", "discount_amount", "total_ht", 
+        "tax_amount", "total_ttc", "amount_in_words", 
+        "created_at", "updated_at"
+    )
+    
+    inlines = [QuoteItemInline]
+
+
+@admin.register(PurchaseOrder)
+class PurchaseOrderAdmin(admin.ModelAdmin):
+    list_display = (
+        "po_number",
+        "client",
+        "chantier",
+        "status",
+        "total_ttc",
+        "issued_date",
+        "expected_delivery_date",
+    )
+    list_filter = ("status", "issued_date", "client")
+    search_fields = ("po_number", "client__company_name", "chantier__name")
+
+    fieldsets = (
+        ("General Info", {
+            "fields": ("po_number", "status", "client", "chantier", "created_by")
+        }),
+        ("Dates", {
+            "fields": ("issued_date", "expected_delivery_date")
+        }),
+        ("Financials", {
+            "fields": (
+                "subtotal", "discount_percentage", "discount_amount", 
+                "total_ht", "tax_rate", "tax_amount", "total_ttc", 
+                "amount_in_words"
+            )
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at")
+        }),
+    )
+
+    readonly_fields = (
+        "subtotal", "discount_amount", "total_ht", 
+        "tax_amount", "total_ttc", "amount_in_words", 
+        "created_at", "updated_at"
+    )
+
+    inlines = [POItemInline]
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
@@ -112,14 +219,22 @@ class ClientAdmin(admin.ModelAdmin):
 @admin.register(Chantier)
 class ChantierAdmin(admin.ModelAdmin):
     list_display = (
+        "id",
         "name",
-        "client",
-        "responsible",
+        "department",
+        "get_responsibles",
         "start_date",
         "end_date",
     )
     list_filter = ("department", "start_date")
     search_fields = ("name", "location", "contract_number")
+
+    def get_responsibles(self, obj):
+        return ", ".join(
+            user.get_full_name() for user in obj.responsible.all()
+        )
+
+    get_responsibles.short_description = "Responsibles"
 
 
 @admin.register(Employee)

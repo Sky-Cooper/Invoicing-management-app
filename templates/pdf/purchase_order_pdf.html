@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        /* Exact same CSS as above */
+        @page { size: A4; margin: 1.2cm; margin-bottom: 3cm; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; color: #000; font-size: 10px; line-height: 1.4; margin: 0; padding: 0; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #D32F2F; padding-bottom: 10px; }
+        .company-info .slogan { font-size: 14px; font-weight: bold; color: #D32F2F; text-transform: uppercase; display: block; margin-bottom: 2px; }
+        .company-logo { height: 80px; object-fit: contain; }
+        .invoice-meta { margin-bottom: 20px; }
+        .invoice-id { font-size: 16px; font-weight: bold; color: #000; margin-bottom: 5px; }
+        .date { font-weight: bold; font-size: 11px; }
+        .client-container { display: flex; justify-content: flex-end; margin-bottom: 35px; }
+        .client-box { border: 1.5px solid #000; padding: 12px; width: 60%; }
+        .client-box strong { display: block; text-decoration: underline; margin-bottom: 8px; font-size: 12px; color: #D32F2F; }
+        .client-table { width: 100%; border-collapse: collapse; }
+        .client-table td { padding: 3px 0; vertical-align: top; }
+        .client-label { font-weight: bold; width: 85px; color: #000; }
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+        .items-table th { border: 1.5px solid #000; background-color: #000; color: #FFF; padding: 8px; text-align: center; text-transform: uppercase; font-weight: bold; }
+        .items-table td { border: 1px solid #000; padding: 8px; vertical-align: top; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .totals-container { display: flex; justify-content: flex-end; margin-top: 10px; }
+        .totals-table { width: 60%; border-collapse: collapse; }
+        .totals-table td { border: 1px solid #000; padding: 8px 10px; font-weight: bold; font-size: 11px; }
+        .total-label { text-align: left; background-color: #f9f9f9; }
+        .total-value { text-align: right; width: 35%; }
+        .grand-total { font-size: 14px; background-color: #D32F2F !important; color: #FFF; border: 1.5px solid #000; }
+        .legal-summary { margin-top: 40px; font-weight: bold; font-style: italic; border-bottom: 1px solid #000; padding-bottom: 5px; display: inline-block; font-size: 11px; }
+        .page-footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; border-top: 2px solid #D32F2F; padding-top: 15px; padding-bottom: 15px; font-size: 11px; color: #000; background-color: #fff; }
+        .footer-address { margin-bottom: 8px; font-weight: bold; }
+        .footer-ice { font-size: 22px; font-weight: 900; margin-top: 10px; display: block; text-transform: uppercase; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-info">
+            <span class="slogan">{{ company.title|default:"VOTRE STRUCTURE" }}</span> 
+            <span class="slogan">{{ company.subtitle|default:"NOTRE EXCELLENCE" }}</span> 
+        </div>
+        {% if logo_path %} <img src="file://{{ logo_path }}" class="company-logo"> {% endif %}
+    </div>
+
+    <div class="invoice-meta">
+        <div class="invoice-id">BON DE COMMANDE N°: {{ invoice.po_number }}</div> 
+        <div class="date">Date: {{ invoice.issued_date|date:"d/m/Y" }}</div> 
+    </div>
+
+    <div class="client-container">
+        <div class="client-box">
+            <strong>Client</strong>
+            <table class="client-table">
+                <tr><td class="client-label">Nom :</td><td>{{ invoice.client.company_name }}</td></tr> 
+                <tr><td class="client-label">ICE :</td><td>{{ invoice.client.ice }}</td></tr> 
+                <tr><td class="client-label">Adresse:</td><td>{{ invoice.client.address }}</td></tr> 
+                <tr><td class="client-label">Objet:</td><td>{{ invoice.project_description }}</td></tr> 
+            </table>
+        </div>
+    </div>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th width="8%">Poste</th> <th width="42%">Designation</th>
+                <th width="10%">UN</th> <th width="10%">QTE</th> <th width="15%">PU HT (DH)</th> <th width="15%">PT HT (DH)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in invoice.items.all %}
+            <tr>
+                <td class="text-center">{{ forloop.counter }}</td>
+                <td>
+                    <strong>{{ item.item_name }}</strong><br>
+                    <span style="font-size: 9px; color: #333;">{{ item.item_description|default:"" }}</span>
+                </td>
+                <td class="text-center">{{ item.unit }}</td>
+                <td class="text-center">{{ item.quantity }}</td>
+                <td class="text-right">{{ item.unit_price|floatformat:2 }}</td>
+                <td class="text-right">{{ item.subtotal|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals-container">
+        <table class="totals-table">
+            <tr><td class="total-label">Total HT (DH)</td> <td class="total-value">{{ invoice.subtotal|floatformat:2 }}</td></tr>
+            <tr><td class="total-label">Réception provisoire 10% (DH)</td> <td class="total-value">{{ invoice.discount_amount|floatformat:2 }}</td></tr>
+            <tr><td class="total-label">PRIX TOTAL HT APRES DEDUCTION (DH)</td> <td class="total-value">{{ invoice.total_ht|floatformat:2 }}</td></tr>
+            <tr><td class="total-label">TVA {{ invoice.tax_rate|floatformat:0 }}% (DH)</td> <td class="total-value">{{ invoice.tax_amount|floatformat:2 }}</td></tr>
+            <tr class="grand-total"><td class="total-label" style="color: #000;">TOTAL TTC (DH)</td> <td class="total-value">{{ invoice.total_ttc|floatformat:2 }}</td></tr>
+        </table>
+    </div>
+
+    <div class="legal-summary">
+        Arrêté le présent bon de commande à la somme de: {{ invoice.amount_in_words|upper }}
+    </div>
+
+    <div class="page-footer">
+        <div class="footer-address">{{ company.address }}</div>
+        <div>TEL: {{ company.phone }} {% if company.email %} | EMAIL: {{ company.email }} {% endif %}</div>
+        <div class="footer-ice">I.C.E: {{ company.ice }}</div>
+    </div>
+</body>
+</html>

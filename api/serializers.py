@@ -16,6 +16,12 @@ from api.models import (
     InvoiceItem,
     Expense,
     Payment,
+    EmployeeEOSB,
+    EmployeeWorkingContract,
+    Quote,
+    QuoteItem,
+    PurchaseOrder, 
+    POItem
 )
 from django.db.models import Sum
 from django.conf import settings
@@ -530,18 +536,18 @@ class ChantierAssignmentSerializer(serializers.ModelSerializer):
         return attrs
 
 class ChantierSerializer(serializers.ModelSerializer):
-    responsible = DepartmentAdminRetrieveSerializer(read_only=True)
-    responsible_id = serializers.PrimaryKeyRelatedField(
+    responsible = DepartmentAdminRetrieveSerializer(read_only=True, many=True)
+    responsible_ids = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.filter(role=UserRole.HR_ADMIN),
         source="responsible",
         write_only=True,
         required=False,
+        many=True
     )
 
     employees = ChantierAssignmentSerializer(
         source="employee_assignments", many=True, read_only=True
     )
-
 
     class Meta:
         model = Chantier
@@ -551,18 +557,17 @@ class ChantierSerializer(serializers.ModelSerializer):
             "location",
             "description",
             "contract_number",
-            "image",
+            "document", 
             "contract_date",
             "department",
             "client",
             "responsible",
-            "responsible_id",
+            "responsible_ids",
             "start_date",
             "end_date",
             "employees",
             "created_at",
         ]
-
 
 
 
@@ -625,7 +630,18 @@ class ExpenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Expense
         fields = "__all__"
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at", "created_by"]
+
+    
+    def create(self, validated_data):
+        user = self.context['request'].user
+        if not user.role  in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN, UserRole.HR_ADMIN]:
+            raise serializer.ValidationError("only company admin, invoicing admin , hr admin, allowed to create expenses")
+
+        validated_data['created_by'] = user
+
+        return super().create(validated_data)
+
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -671,6 +687,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "tax_amount",
             "total_ttc",
             "amount_in_words",
+            "remaining_balance"
         ]
 
     def validate(self, attrs):
@@ -697,6 +714,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         items_data = validated_data.pop("items")
+       
 
         invoice = Invoice.objects.create(**validated_data)
 
@@ -786,3 +804,125 @@ class PaymentSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+
+
+class EmployeeWorkingContractSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = EmployeeWorkingContract
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+
+        if user.role not in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
+            raise serializers.ValidationError(
+                "Only Company Admin or HR Admin can create an employee working contract"
+            )
+
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["employee"] = EmployeeSerializer(instance.employee).data
+        return data
+
+
+
+
+class EmployeeEOSBSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = EmployeeEOSB
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+
+        if user.role not in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
+            raise serializers.ValidationError(
+                "Only Company Admin or HR Admin can create an end of service benefit record"
+            )
+
+        employee = validated_data.get("employee")
+
+        # Safety check: only one EOSB per employee
+        if hasattr(employee, "eosb_record"):
+            raise serializers.ValidationError(
+                "This employee already has an end of service benefit record"
+            )
+
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["employee"] = EmployeeSerializer(instance.employee).data
+        return data
+
+
+
+class QuoteItemSerializer(serializers.ModelSerializer):
+    item_id = serializers.PrimaryKeyRelatedField(
+        queryset=Item.objects.all(), source="item", write_only=True, required=False
+    )
+    class Meta:
+        model = QuoteItem
+        fields = ["id", "item_id", "item_code", "item_name", "item_description", "unit", "quantity", "unit_price", "subtotal", "tax_rate"]
+        read_only_fields = ["subtotal"]
+
+class QuoteSerializer(serializers.ModelSerializer):
+    items = QuoteItemSerializer(many=True, read_only=True)
+    download_url = serializers.SerializerMethodField()
+    client_name = serializers.CharField(source="client.company_name", read_only=True)
+
+    class Meta:
+        model = Quote
+        fields = "__all__"
+        read_only_fields = ["created_by", "subtotal", "total_ht", "total_ttc", "amount_in_words", "tax_amount", "discount_amount"]
+
+    def get_download_url(self, obj):
+        if not obj.quote_number: return None
+        filename = f"devis_{obj.quote_number.replace('/', '_')}.pdf"
+        return f"{settings.MEDIA_URL}quotes/{filename}"
+
+class QuoteCreateSerializer(serializers.ModelSerializer):
+    items = QuoteItemSerializer(many=True) # Nested Write
+    class Meta:
+        model = Quote
+        fields = "__all__"
+        read_only_fields = ["created_by", "subtotal", "total_ht", "total_ttc", "amount_in_words"]
+
+
+class POItemSerializer(serializers.ModelSerializer):
+    item_id = serializers.PrimaryKeyRelatedField(
+        queryset=Item.objects.all(), source="item", write_only=True, required=False
+    )
+    class Meta:
+        model = POItem
+        fields = ["id", "item_id", "item_code", "item_name", "item_description", "unit", "quantity", "unit_price", "subtotal", "tax_rate"]
+        read_only_fields = ["subtotal"]
+
+class POSerializer(serializers.ModelSerializer):
+    items = POItemSerializer(many=True, read_only=True)
+    download_url = serializers.SerializerMethodField()
+    client_name = serializers.CharField(source="client.company_name", read_only=True)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = "__all__"
+        read_only_fields = ["created_by", "subtotal", "total_ht", "total_ttc", "amount_in_words", "tax_amount", "discount_amount"]
+
+    def get_download_url(self, obj):
+        if not obj.po_number: return None
+        filename = f"bc_{obj.po_number.replace('/', '_')}.pdf"
+        return f"{settings.MEDIA_URL}purchase_orders/{filename}"
+
+class POCreateSerializer(serializers.ModelSerializer):
+    items = POItemSerializer(many=True)
+    class Meta:
+        model = PurchaseOrder
+        fields = "__all__"
+        read_only_fields = ["created_by", "subtotal", "total_ht", "total_ttc", "amount_in_words"]

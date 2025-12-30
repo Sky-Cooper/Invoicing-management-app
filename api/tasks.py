@@ -5,7 +5,7 @@ from django.template.loader import render_to_string
 from weasyprint import HTML
 from num2words import num2words
 from decimal import Decimal
-from .models import Invoice, InvoiceStatus
+from .models import Invoice, InvoiceStatus, Quote, QuoteItem, POItem,  PurchaseOrder , QuoteStatus, POStatus
 from .services import InvoiceCalculator
 from django.utils import timezone
 from .services import EmailSending
@@ -20,32 +20,10 @@ from datetime import timedelta
 )
 def generate_invoice_pdf_task(self, invoice_id):
     try:
-
+        # Fetch invoice (Data is already calculated by the View)
         invoice = Invoice.objects.select_related("client", "created_by__company").get(
             id=invoice_id
         )
-
-        totals = InvoiceCalculator.get_totals(invoice)
-        invoice.subtotal = totals["subtotal"]
-        invoice.discount_percentage = totals["discount_percentage"]
-        invoice.discount_amount = totals["discount_amount"]
-        invoice.total_ht = totals["total_ht"]
-        invoice.tax_rate = totals["tax_rate"]
-        invoice.tax_amount = totals["tax_amount"]
-        invoice.total_ttc = totals["total_ttc"]
-
-        ttc_value = invoice.total_ttc
-        dirhams = int(ttc_value)
-        centimes = int(round((ttc_value - dirhams) * 100))
-        dirhams_words = num2words(dirhams, lang="fr")
-
-        if centimes > 0:
-            legal_text = f"{dirhams_words} Dirhams Et {centimes} Cts TTC"
-        else:
-            legal_text = f"{dirhams_words} Dirhams TTC"
-
-        invoice.amount_in_words = legal_text.upper()
-        invoice.save()
 
         logo_path = os.path.join(
             settings.BASE_DIR, "static", "assets", "companyLogo.jpg"
@@ -69,16 +47,12 @@ def generate_invoice_pdf_task(self, invoice_id):
 
         HTML(string=html_string, base_url=settings.BASE_DIR).write_pdf(pdf_path)
 
-   
-
-        return f"Invoice {invoice.invoice_number} successfully generated."
+        return f"Invoice {invoice.invoice_number} PDF successfully generated."
 
     except Invoice.DoesNotExist:
         return f"Error: Invoice ID {invoice_id} not found."
     except Exception as exc:
         raise self.retry(exc=exc)
-
-
 @shared_task(
     blank=True,
     autoretry_for=(Exception,),
@@ -139,3 +113,55 @@ def send_thanking_invoice_task(invoice_id):
         email_sending.send_thanking_email()
     except Invoice.DoesNotExist:
         print(f"Invoice {invoice_id} not found for thanking email.")
+
+
+@shared_task
+def generate_po_pdf_task(po_id):
+    try:
+        po = PurchaseOrder.objects.select_related("client", "created_by__company").get(id=po_id)
+        logo_path = os.path.join(settings.BASE_DIR, "static", "assets", "companyLogo.jpg")
+        
+        context = {
+            "invoice": po, 
+            "company": po.created_by.company,
+            "logo_path": logo_path,
+        }
+        
+        html_string = render_to_string("pdf/purchase_order_pdf.html", context)
+        
+        filename = f"bc_{po.po_number.replace('/', '_')}.pdf"
+        directory = os.path.join(settings.MEDIA_ROOT, "purchase_orders")
+        if not os.path.exists(directory): os.makedirs(directory, exist_ok=True)
+        
+        HTML(string=html_string, base_url=settings.BASE_DIR).write_pdf(os.path.join(directory, filename))
+        return f"PO {po.po_number} PDF Generated"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+
+
+
+@shared_task
+def generate_quote_pdf_task(quote_id):
+    try:
+        quote = Quote.objects.select_related("client", "created_by__company").get(id=quote_id)
+        logo_path = os.path.join(settings.BASE_DIR, "static", "assets", "companyLogo.jpg")
+        
+        # Note: We pass 'invoice' key to reuse the same variables in template easier
+        context = {
+            "invoice": quote, 
+            "company": quote.created_by.company,
+            "logo_path": logo_path,
+        }
+        
+        html_string = render_to_string("pdf/quote_pdf.html", context)
+        
+        filename = f"devis_{quote.quote_number.replace('/', '_')}.pdf"
+        directory = os.path.join(settings.MEDIA_ROOT, "quotes")
+        if not os.path.exists(directory): os.makedirs(directory, exist_ok=True)
+        
+        HTML(string=html_string, base_url=settings.BASE_DIR).write_pdf(os.path.join(directory, filename))
+        return f"Quote {quote.quote_number} PDF Generated"
+    except Exception as e:
+        return f"Error: {str(e)}"

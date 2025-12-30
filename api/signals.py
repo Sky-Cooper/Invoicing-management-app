@@ -1,7 +1,8 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.cache import cache
-from .models import Invoice, Payment, Expense, Client, Attendance
+from .models import Invoice, Payment, Expense, Client, Attendance, InvoiceStatus
+from django.db.models import Sum
 
 def clear_company_analytics(company_id):
  
@@ -50,3 +51,27 @@ def invalidate_attendance_cache(sender, instance, **kwargs):
    
     if instance.chantier.department and instance.chantier.department.company:
         clear_company_analytics(instance.chantier.department.company.id)
+
+
+
+@receiver([post_save, post_delete], sender=Payment)
+def update_invoice_balance(sender, instance, **kwargs):
+
+    invoice = instance.invoice
+    
+    total_paid = invoice.payments.aggregate(total=Sum('amount'))['total'] or 0
+    
+    invoice.remaining_balance = max(invoice.total_ttc - total_paid, 0)
+    
+   
+    if invoice.remaining_balance == 0:
+        invoice.status = InvoiceStatus.PAID
+    elif invoice.remaining_balance < invoice.total_ttc:
+        invoice.status = InvoiceStatus.PARTIALLY_PAID
+    elif invoice.remaining_balance == invoice.total_ttc:
+
+        if invoice.status in [InvoiceStatus.PAID, InvoiceStatus.PARTIALLY_PAID]:
+            invoice.status = InvoiceStatus.COMPLETED 
+
+
+    invoice.save(update_fields=['remaining_balance', 'status'])
