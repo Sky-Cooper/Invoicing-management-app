@@ -697,6 +697,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         model = Invoice
         fields = "__all__"
         read_only_fields = [
+            "invoice_number",
             "created_by",
             "subtotal",
             "discount_amount",
@@ -776,6 +777,7 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         model = Invoice
         fields = "__all__"
         read_only_fields = [
+            "invoice_number",
             "created_by",
             "subtotal",
             "discount_amount",

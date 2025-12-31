@@ -7,6 +7,9 @@ from django.contrib.auth.models import (
 from phonenumber_field.modelfields import PhoneNumberField
 import uuid
 from decimal import Decimal
+from django.db import transaction
+from django.utils import timezone
+from django.db.models import Max
 
 
 class LanguageChoices(models.TextChoices):
@@ -380,7 +383,11 @@ class Item(models.Model):
 
 
 class Invoice(models.Model):
-    invoice_number = models.CharField(max_length=50, unique=True)
+    invoice_number = models.CharField(
+    max_length=50,
+    unique=True,
+    blank=True
+)
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="invoices"
     )
@@ -432,6 +439,34 @@ class Invoice(models.Model):
     def __str__(self):
         return f"Invoice {self.invoice_number} - {self.client.company_name}"
 
+    def save(self, *args, **kwargs):
+        if not self.invoice_number:
+            self.invoice_number = self.generate_invoice_number()
+        super().save(*args, **kwargs)
+
+
+    def generate_invoice_number(self):
+        
+        date = self.issued_date or timezone.now().date()
+        year = date.year
+        month = f"{date.month:02d}"
+
+        prefix = f"{year}-{month}-"
+
+        with transaction.atomic():
+            last_invoice = (
+                Invoice.objects
+                .filter(invoice_number__startswith=prefix)
+                .aggregate(max_number=Max("invoice_number"))
+            )["max_number"]
+
+            if last_invoice:
+                last_seq = int(last_invoice.split("-")[-1])
+                next_seq = last_seq + 1
+            else:
+                next_seq = 1
+
+            return f"{prefix}{next_seq:04d}"
 
 class InvoiceItem(models.Model):
     invoice = models.ForeignKey(
