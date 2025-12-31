@@ -359,6 +359,9 @@ class Attendance(models.Model):
     class Meta:
         unique_together = ("employee", "chantier", "date")
 
+    def __str__(self):
+        return f"{self.employee} - {self.chantier} ({self.date})"
+
 
 class Item(models.Model):
     code = models.CharField(max_length=50, blank=True, null=True)  #

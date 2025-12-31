@@ -572,41 +572,57 @@ class ChantierSerializer(serializers.ModelSerializer):
 
 
 class AttendanceSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Attendance
-        fields = [
-                "id",
-                "name",
-                "location",
-                "description",
-                "contract_number",
-                "contract_date",
-                "client",
-                "department",
-                "responsible",
-                "image",  
-                "start_date",
-                "end_date",
-            ]
-
+        fields = "__all__"
         read_only_fields = ["id", "created_at"]
 
     def validate(self, attrs):
         user = self.context["request"].user
         chantier = attrs.get("chantier")
+        employee = attrs.get("employee")
+        date = attrs.get("date")
+        present = attrs.get("present", False)
+        hours_worked = attrs.get("hours_worked", 0)
 
-        if user.role not in [UserRole.HR_ADMIN, UserRole.COMPANY_ADMIN] and not user.is_superuser:
-            raise serializers.ValidationError("Only HR admins can mark attendance")
+        if not (
+            user.is_superuser or
+            user.role in [UserRole.HR_ADMIN, UserRole.COMPANY_ADMIN]
+        ):
+            raise serializers.ValidationError(
+                "You are not allowed to mark attendance"
+            )
 
+       
         if user.role == UserRole.HR_ADMIN:
-            if not chantier.responsible == user:
+            if not chantier.responsible.filter(id=user.id).exists():
                 raise serializers.ValidationError(
                     "You are not responsible for this chantier"
                 )
 
+      
         if user.role == UserRole.COMPANY_ADMIN:
             if chantier.department.company != user.company:
-                raise serializers.ValidationError("This chantier belongs to a different company")
+                raise serializers.ValidationError(
+                    "This chantier belongs to a different company"
+                )
+
+      
+        if Attendance.objects.filter(
+            employee=employee,
+            chantier=chantier,
+            date=date
+        ).exists():
+            raise serializers.ValidationError(
+                "Attendance already recorded for this employee on this date"
+            )
+
+     
+        if not present and hours_worked > 0:
+            raise serializers.ValidationError(
+                "Hours worked must be 0 if employee is not present"
+            )
 
         return attrs
 
@@ -615,6 +631,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
         data["employee"] = EmployeeSerializer(instance.employee).data
         data["chantier"] = ChantierSerializer(instance.chantier).data
         return data
+
 
 
 class ItemSerializer(serializers.ModelSerializer):
