@@ -45,7 +45,9 @@ from .serializers import (
     POSerializer,
     POItemSerializer,
     QuoteSerializer,
-    QuoteItemSerializer
+    QuoteItemSerializer,
+    QuotePatchSerializer,
+    POPatchSerializer
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.views import APIView
@@ -97,7 +99,7 @@ from num2words import num2words
 import os
 from decimal import Decimal
 from django.db import transaction
-
+from rest_framework.generics import get_object_or_404
 
 client = openai.OpenAI(api_key=settings.OPENAI_KEY)
 
@@ -914,6 +916,12 @@ class QuoteCreateApiView(APIView):
         qs = Quote.objects.filter(created_by__company=user.company).order_by('-created_at')
         return Response(QuoteSerializer(qs, many=True).data)
 
+
+
+
+
+
+
 class POCreateApiView(APIView):
     permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
 
@@ -970,3 +978,30 @@ class POCreateApiView(APIView):
 
 
 
+
+class QuotePatchApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        quote = get_object_or_404(Quote, pk=pk)
+        serializer = QuotePatchSerializer(quote, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(QuoteSerializer(quote).data, status = status.HTTP_200_OK)
+
+
+class POPatchApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        po = get_object_or_404(PurchaseOrder, pk=pk)
+        serializer = POPatchSerializer(po, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(POPatchSerializer(po).data, status = status.HTTP_200_OK)
+
+      

@@ -25,7 +25,9 @@ from .views import (
     EmployeeEOSBViewSet,
     EmployeeWorkingContractViewSet,
     QuoteCreateApiView,
-    POCreateApiView
+    POCreateApiView,
+    QuotePatchApiView,
+    POPatchApiView
 
 )
 
@@ -55,6 +57,8 @@ urlpatterns = [
     path("invoices", InvoiceCreateApiView.as_view()),
     path("quotes/", QuoteCreateApiView.as_view()),
     path("po/", POCreateApiView.as_view()),
+    path("quotes/<int:pk>/", QuotePatchApiView.as_view(), name="quote-patch"),
+    path("po/<int:pk>/", POPatchApiView.as_view(), name="po-patch"),
     path("invoices/<int:pk>/", InvoiceDetailApiView.as_view(), name="invoice-detail"),
     path("dashboard/data", DashboardAnalyticsView.as_view()),
     path("dashboard/executive", ExecutiveDashboardView.as_view()),

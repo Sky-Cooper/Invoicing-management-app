@@ -868,7 +868,7 @@ class EmployeeEOSBSerializer(serializers.ModelSerializer):
 
         employee = validated_data.get("employee")
 
-        # Safety check: only one EOSB per employee
+
         if hasattr(employee, "eosb_record"):
             raise serializers.ValidationError(
                 "This employee already has an end of service benefit record"
@@ -945,3 +945,22 @@ class POCreateSerializer(serializers.ModelSerializer):
         model = PurchaseOrder
         fields = "__all__"
         read_only_fields = ["created_by", "subtotal", "total_ht", "total_ttc", "amount_in_words"]
+
+
+
+
+class QuotePatchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Quote
+        fields = ["status", "project_description", "valid_until", "chantier"]
+        read_only_fields = [
+            "subtotal", "total_ht", "total_ttc", "amount_in_words", "discount_amount", "tax_amount"
+        ]
+
+class POPatchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PurchaseOrder
+        fields = ["status", "project_description", "expected_delivery_date", "chantier"]
+        read_only_fields = [
+            "subtotal", "total_ht", "total_ttc", "amount_in_words", "discount_amount", "tax_amount"
+        ]
