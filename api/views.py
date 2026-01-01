@@ -250,7 +250,7 @@ class HrAdminRetreiveDataViewSet(generics.ListAPIView):
 
 class ClientViewSet(viewsets.ModelViewSet):
     serializer_class = ClientSerializer
-    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+    permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
 
     def get_queryset(self):
         user = self.request.user
@@ -258,7 +258,7 @@ class ClientViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return Client.objects.all()
 
-        if user.role == UserRole.COMPANY_ADMIN:
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN]:
             return Client.objects.filter(company=user.company)
 
         return Client.objects.none()
@@ -305,7 +305,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return Employee.objects.all()
 
-        if user.role in {UserRole.COMPANY_ADMIN , UserRole.HR_ADMIN}:
+        if user.role in [UserRole.COMPANY_ADMIN , UserRole.HR_ADMIN]:
             return Employee.objects.filter(user__company=user.company)
 
         return Employee.objects.none()
@@ -363,7 +363,7 @@ class EmployeeWorkingContractViewSet(viewsets.ModelViewSet):
 
 class ChantierViewSet(viewsets.ModelViewSet):
     serializer_class = ChantierSerializer
-    permission_classes = [permissions.IsAuthenticated, IsCompanyOrHRAdmin]
+    permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
     def get_queryset(self):
@@ -379,7 +379,7 @@ class ChantierViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return qs
 
-        if user.role == UserRole.COMPANY_ADMIN:
+        if user.role in [UserRole.COMPANY_ADMIN]:
             return qs.filter(department__company=user.company)
 
         if user.role == UserRole.HR_ADMIN:
@@ -525,11 +525,10 @@ class InvoiceCreateApiView(APIView):
         items_data = serializer.validated_data.pop("items")
         invoice = serializer.save(created_by=request.user)
 
-        # 1. Create Items
         for item_data in items_data:
             InvoiceItem.objects.create(invoice=invoice, **item_data)
 
-        # 2. Calculate Totals Synchronously (So API response is correct)
+   
         totals = InvoiceCalculator.get_totals(invoice)
         
         invoice.subtotal = totals["subtotal"]
@@ -541,7 +540,7 @@ class InvoiceCreateApiView(APIView):
         invoice.total_ttc = totals["total_ttc"]
         invoice.remaining_balance = totals["total_ttc"]
 
-        # 3. Calculate Amount in Words
+ 
         ttc_value = invoice.total_ttc
         dirhams = int(ttc_value)
         centimes = int(round((ttc_value - dirhams) * 100))
@@ -554,13 +553,13 @@ class InvoiceCreateApiView(APIView):
 
         invoice.amount_in_words = legal_text.upper()
         
-        # Save calculated values to DB
+    
         invoice.save()
 
-        # 4. Trigger PDF Generation Task (Background)
+       
         transaction.on_commit(lambda: generate_invoice_pdf_task.delay(invoice.id))
         
-        # 5. Return Response with Calculated Data
+   
         data = InvoiceSerializer(invoice).data
 
         pdf_filename = f"facture_{invoice.invoice_number.replace('/', '_')}.pdf"
