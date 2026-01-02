@@ -471,6 +471,7 @@ class ClientSerializer(serializers.ModelSerializer):
 
         return super().create(validated_data)
 
+
 class ChantierMiniSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source="department.name", read_only=True)
 
@@ -547,6 +548,13 @@ class ChantierSerializer(serializers.ModelSerializer):
 
     employees = ChantierAssignmentSerializer(
         source="employee_assignments", many=True, read_only=True
+    )  
+
+    employee_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Employee.objects.all(),
+        write_only=True,
+        required=False,
+        many=True
     )
 
     class Meta:
@@ -560,6 +568,7 @@ class ChantierSerializer(serializers.ModelSerializer):
             "document", 
             "contract_date",
             "department",
+            "employee_ids",
             "client",
             "responsible",
             "responsible_ids",

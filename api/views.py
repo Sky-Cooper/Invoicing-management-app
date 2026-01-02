@@ -392,9 +392,24 @@ class ChantierViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
+
         if user.role not in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
             raise PermissionDenied("Only admins can create chantiers")
-        serializer.save()
+
+        with transaction.atomic():
+            employee_ids = serializer.validated_data.pop("employee_ids", [])
+            chantier = serializer.save()
+
+            assignments = [
+                ChantierAssignment(
+                    chantier=chantier,
+                    employee=employee,
+                    is_active=True
+                )
+                for employee in employee_ids
+            ]
+
+            ChantierAssignment.objects.bulk_create(assignments)
 
 
 class ChantierAssignmentViewSet(viewsets.ModelViewSet):
@@ -1003,4 +1018,32 @@ class POPatchApiView(APIView):
 
         return Response(POPatchSerializer(po).data, status = status.HTTP_200_OK)
 
-      
+
+
+class GetEmployeeBasedOnChantier(generics.ListAPIView):
+    serializer_class = EmployeeSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrHRAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+        chantier_id = self.request.query_params.get("chantier_id")
+
+        if not chantier_id:
+            return Employee.objects.none()
+
+        if user.is_superuser:
+            return Employee.objects.filter(
+                chantier_assignments__chantier_id=chantier_id,
+                chantier_assignments__is_active=True
+            )
+
+ 
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
+            return Employee.objects.filter(
+                user__company=user.company,
+                chantier_assignments__chantier_id=chantier_id,
+                chantier_assignments__is_active=True
+            )
+
+        return Employee.objects.none()
+

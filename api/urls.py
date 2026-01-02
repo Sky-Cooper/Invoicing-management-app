@@ -27,7 +27,8 @@ from .views import (
     QuoteCreateApiView,
     POCreateApiView,
     QuotePatchApiView,
-    POPatchApiView
+    POPatchApiView,
+    GetEmployeeBasedOnChantier
 
 )
 
@@ -71,6 +72,7 @@ urlpatterns = [
         name="department-admins",
     ),
     path("hr-deparements/admins", HrAdminRetreiveDataViewSet.as_view(), name="hr-deparements-admins"),
+    path("employee-chantier", GetEmployeeBasedOnChantier.as_view(), name = "employee-chantier"),
     path("company/details", CompanyDetailsUpdateView.as_view(), name="company-details"),
     path("", include(router.urls)),
 ]
