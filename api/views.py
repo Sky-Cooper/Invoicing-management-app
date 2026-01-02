@@ -15,7 +15,9 @@ from .models import (
     Expense,
     Payment,
     InvoiceStatus,
-    ChatMessage
+    ChatMessage,
+    EmployeeWorkingContract,
+    EmployeeEOSB
 )
 from .models import Quote, QuoteItem, PurchaseOrder, POItem
 from .serializers import (
@@ -350,7 +352,7 @@ class EmployeeWorkingContractViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]
 
     def get_queryset(self):
-        user = self.requets.user
+        user = self.request.user
 
         if user.is_superuser:
             return EmployeeWorkingContract.objects.all()
