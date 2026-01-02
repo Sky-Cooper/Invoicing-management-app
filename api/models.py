@@ -198,8 +198,6 @@ class EmployeeWorkingContract(models.Model):
         on_delete=models.CASCADE,
         related_name='working_contract'
     )
-
-
     contract_number = models.CharField(max_length=100, unique=True)
     contract_start_date = models.DateField()
     contract_end_date = models.DateField(null=True, blank=True)
@@ -534,16 +532,19 @@ class Payment(models.Model):
     payment_date = models.DateField()
     reference = models.CharField(max_length=100, blank=True, null=True)
     notes = models.TextField(blank=True, null=True)
+    created_by = models.ForeignKey(User, on_delete = models.SET_NULL, null = True, blank = True, related_name = "payments")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Payment of {self.amount} for Invoice {self.invoice.invoice_number}"
 
     class Meta:
+        ordering = ["-payment_date"]
         indexes = [
             models.Index(fields=["payment_date"]),
             models.Index(fields=["payment_method"]),
         ]
+
 
 
 class ChatMessage(models.Model):

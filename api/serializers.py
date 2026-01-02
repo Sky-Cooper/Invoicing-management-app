@@ -813,16 +813,18 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = "__all__"
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at", "created_by"]
 
     def validate(self, attrs):
-        invoice = attrs.get("invoice") or self.instance.invoice
-        amount = attrs.get("amount")
+        invoice = attrs.get("invoice") or getattr(self.instance, "invoice", None)
+        amount = attrs.get("amount") or getattr(self.instance, "amount", None)
+
+        if not invoice or amount is None:
+            return attrs
 
         total_paid = (
-            invoice.payments.exclude(pk=getattr(self.instance, "pk", None)).aggregate(
-                total=Sum("amount")
-            )["total"]
+            invoice.payments.exclude(pk=getattr(self.instance, "pk", None))
+            .aggregate(total=Sum("amount"))["total"]
             or 0
         )
 
@@ -832,6 +834,13 @@ class PaymentSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        validated_data["created_by"] = user
+        return super().create(validated_data)
+
 
 
 

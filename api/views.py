@@ -397,7 +397,7 @@ class ChantierViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
 
-        if user.role not in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
+        if user.role not in [UserRole.COMPANY_ADMIN]:
             raise PermissionDenied("Only admins can create chantiers")
 
         with transaction.atomic():
@@ -524,8 +524,12 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return Payment.objects.all()
 
-        if user.role in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN]:
+        if user.role in [UserRole.COMPANY_ADMIN]:
             return Payment.objects.filter(invoice__client__company=user.company)
+
+        if user.role == UserRole.INVOICING_ADMIN:
+            return Payment.objects.filter(created_by = user)
+            
 
         return Payment.objects.none()
 
