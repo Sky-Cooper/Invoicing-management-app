@@ -362,6 +362,8 @@ class EmployeeWorkingContractViewSet(viewsets.ModelViewSet):
 
         return EmployeeWorkingContract.objects.none()
 
+    
+   
 
 class ChantierViewSet(viewsets.ModelViewSet):
     serializer_class = ChantierSerializer
@@ -381,7 +383,7 @@ class ChantierViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return qs
 
-        if user.role in [UserRole.COMPANY_ADMIN]:
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN]:
             return qs.filter(department__company=user.company)
 
         if user.role == UserRole.HR_ADMIN:
