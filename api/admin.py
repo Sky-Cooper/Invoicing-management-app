@@ -20,7 +20,10 @@ from .models import (
     POItem,  
     PurchaseOrder, 
     QuoteStatus, 
-    POStatus
+    POStatus,
+    ChantierDocument,
+    FixedCharge,
+    AttendanceReport
 )
 
 
@@ -41,24 +44,27 @@ class POItemInline(admin.TabularInline):
 
 # --- MAIN ADMIN MODELS ---
 
+
+admin.site.register(FixedCharge)
+admin.site.register(AttendanceReport)
+
 @admin.register(Quote)
 class QuoteAdmin(admin.ModelAdmin):
     list_display = (
         "quote_number",
         "client",
-        "chantier",
         "status",
         "total_ttc",
         "issued_date",
         "valid_until",
     )
     list_filter = ("status", "issued_date", "client")
-    search_fields = ("quote_number", "client__company_name", "chantier__name")
+    search_fields = ("quote_number", "client__company_name")
     
     # Organize the detail view nicely
     fieldsets = (
         ("General Info", {
-            "fields": ("quote_number", "status", "client", "chantier", "created_by")
+            "fields": ("quote_number", "status", "client",  "created_by")
         }),
         ("Dates", {
             "fields": ("issued_date", "valid_until")
@@ -89,18 +95,17 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
     list_display = (
         "po_number",
         "client",
-        "chantier",
         "status",
         "total_ttc",
         "issued_date",
         "expected_delivery_date",
     )
     list_filter = ("status", "issued_date", "client")
-    search_fields = ("po_number", "client__company_name", "chantier__name")
+    search_fields = ("po_number", "client__company_name")
 
     fieldsets = (
         ("General Info", {
-            "fields": ("po_number", "status", "client", "chantier", "created_by")
+            "fields": ("po_number", "status", "client", "created_by")
         }),
         ("Dates", {
             "fields": ("issued_date", "expected_delivery_date")
@@ -235,6 +240,24 @@ class ChantierAdmin(admin.ModelAdmin):
         )
 
     get_responsibles.short_description = "Responsibles"
+
+
+@admin.register(ChantierDocument)
+class ChantierDocumentAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "chantier",
+        "document",
+        "created_at",
+    )
+
+    list_filter = ("chantier", "created_at")
+    search_fields = (
+        "chantier__name",
+        "document",
+    )
+
+    readonly_fields = ("created_at",)
 
 
 @admin.register(Employee)

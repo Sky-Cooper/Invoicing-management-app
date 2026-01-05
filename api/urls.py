@@ -28,8 +28,9 @@ from .views import (
     POCreateApiView,
     QuotePatchApiView,
     POPatchApiView,
-    GetEmployeeBasedOnChantier
-
+    GetEmployeeBasedOnChantier,
+    FixedChargeViewSet,
+    AttendanceReportViewSet
 )
 
 
@@ -41,6 +42,7 @@ router.register(r"departments", DepartmentViewSet, basename="departments")
 router.register(
     r"departments-admins", DepartmentAdminViewSet, basename="departments-admins"
 )
+router.register(r'attendance-reports', AttendanceReportViewSet, basename='attendance-reports')
 router.register(r"items", ItemViewSet, basename="items")
 router.register(r"clients", ClientViewSet, basename="clients")
 router.register(r"employees", EmployeeViewSet, basename="employees")
@@ -52,6 +54,7 @@ router.register(
 )
 router.register(r"attendances", AttendanceViewSet, basename="attendances")
 router.register(r"expenses", ExpenseViewSet, basename="expenses")
+router.register(r"fixed-charges", FixedChargeViewSet, basename = "fixed-charges")
 
 urlpatterns = [
     path("register/company-owner", CompanyOwnerRegistrationView.as_view()),

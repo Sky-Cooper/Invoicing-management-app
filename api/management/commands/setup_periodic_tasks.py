@@ -46,10 +46,11 @@ from django_celery_beat.models import PeriodicTask, CrontabSchedule
 
 
 class Command(BaseCommand):
-    help = "Create default Celery Beat periodic tasks for TESTING (Runs every 5 mins)"
+    help = "Create default Celery Beat periodic tasks"
 
     def handle(self, *args, **kwargs):
 
+        # 🔹 Testing schedule (every 5 minutes)
         testing_schedule, _ = CrontabSchedule.objects.get_or_create(
             minute="*/5",
             hour="*",
@@ -58,24 +59,67 @@ class Command(BaseCommand):
             month_of_year="*",
         )
 
+        # 🔹 Monthly fixed expense schedule (daily at 02:00)
+        monthly_schedule, _ = CrontabSchedule.objects.get_or_create(
+            minute="0",
+            hour="2",
+            day_of_week="*",
+            day_of_month="*",
+            month_of_year="*",
+        )
+        weekly_schedule, _ = CrontabSchedule.objects.get_or_create(
+            minute="0",
+            hour="6",
+            day_of_week="1", # 0=Sunday, 1=Monday
+            day_of_month="*",
+            month_of_year="*",
+        )
+
+        # PeriodicTask.objects.update_or_create(
+        #     name="Invoice General Reminders - TEST",
+        #     defaults={
+        #         "crontab": testing_schedule,
+        #         "task": "api.tasks.send_invoice_reminders",
+        #     },
+        # )
+
+        # PeriodicTask.objects.update_or_create(
+        #     name="Invoice Pre-Due Milestones - TEST",
+        #     defaults={
+        #         "crontab": testing_schedule,
+        #         "task": "api.tasks.send_invoice_reminders_pre_due",
+        #     },
+        # )
+
         PeriodicTask.objects.update_or_create(
-            name="Invoice General Reminders - TEST",
+            name="Generate Monthly Fixed Expenses",
             defaults={
-                "crontab": testing_schedule,
-                "task": "api.tasks.send_invoice_reminders",
+                "crontab": monthly_schedule,
+                "task": "api.tasks.generate_monthly_fixed_expenses",
             },
         )
 
         PeriodicTask.objects.update_or_create(
-            name="Invoice Pre-Due Milestones - TEST",
+            name="Generate Weekly Attendance Report",
             defaults={
-                "crontab": testing_schedule,
-                "task": "api.tasks.send_invoice_reminders_pre_due",
+                "crontab": weekly_schedule,
+                "task": "api.tasks.generate_weekly_pointage_pdf", # Matches the function name in tasks.py
             },
         )
+
+        # Monthly Pointage
+        PeriodicTask.objects.update_or_create(
+            name="Generate Monthly Attendance Report",
+            defaults={
+                "crontab": monthly_schedule,
+                "task": "api.tasks.generate_monthly_pointage_pdf", # Matches the function name in tasks.py
+            },
+        )
+
+        self.stdout.write(self.style.SUCCESS("Attendance Periodic tasks successfully created."))
 
         self.stdout.write(
             self.style.SUCCESS(
-                "Testing tasks (General & Pre-Due) are active every 5 minutes."
+                "Periodic tasks successfully created/updated."
             )
         )

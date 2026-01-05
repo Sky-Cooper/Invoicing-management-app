@@ -17,9 +17,11 @@ from .models import (
     InvoiceStatus,
     ChatMessage,
     EmployeeWorkingContract,
-    EmployeeEOSB
+    EmployeeEOSB,
+    FixedCharge, 
+    AttendanceReport
 )
-from .models import Quote, QuoteItem, PurchaseOrder, POItem
+from .models import Quote, QuoteItem, PurchaseOrder, POItem, ReportType
 from .serializers import (
     CustomTokenObtainPairSerializer,
     CompanyOwnerRegistrationSerializer,
@@ -49,7 +51,9 @@ from .serializers import (
     QuoteSerializer,
     QuoteItemSerializer,
     QuotePatchSerializer,
-    POPatchSerializer
+    POPatchSerializer,
+    FixedChargeSerializer,
+    AttendanceReportSerializer
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.views import APIView
@@ -102,6 +106,8 @@ import os
 from decimal import Decimal
 from django.db import transaction
 from rest_framework.generics import get_object_or_404
+from rest_framework.decorators import action
+
 
 client = openai.OpenAI(api_key=settings.OPENAI_KEY)
 
@@ -1055,3 +1061,67 @@ class GetEmployeeBasedOnChantier(generics.ListAPIView):
 
         return Employee.objects.none()
 
+
+
+
+class FixedChargeViewSet(viewsets.ModelViewSet):
+    serializer_class = FixedChargeSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # 1. Superuser sees all
+        if user.is_superuser:
+            return FixedCharge.objects.all()
+
+        # 2. Company Users see only their company's fixed charges
+        # Path: FixedCharge -> Chantier -> Department -> Company
+        if user.role == UserRole.COMPANY_ADMIN:
+            return FixedCharge.objects.filter(chantier__department__company=user.company)
+
+        return FixedCharge.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+
+  
+        if user.role not in [UserRole.COMPANY_ADMIN] and not user.is_superuser:
+            raise PermissionDenied("You do not have permission to create fixed charges.")
+
+        serializer.save(created_by=user)
+
+
+
+
+
+
+class AttendanceReportViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = AttendanceReport.objects.all().order_by('-created_at')
+    serializer_class = AttendanceReportSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'])
+    def weekly(self, request):
+        reports = self.get_queryset().filter(report_type=ReportType.WEEKLY)
+        
+        page = self.paginate_queryset(reports)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(reports, many=True)
+        return Response(serializer.data)
+
+ 
+    @action(detail=False, methods=['get'])
+    def monthly(self, request):
+        reports = self.get_queryset().filter(report_type=ReportType.MONTHLY)
+        
+        page = self.paginate_queryset(reports)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(reports, many=True)
+        return Response(serializer.data)

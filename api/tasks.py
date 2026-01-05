@@ -5,12 +5,14 @@ from django.template.loader import render_to_string
 from weasyprint import HTML
 from num2words import num2words
 from decimal import Decimal
-from .models import Invoice, InvoiceStatus, Quote, QuoteItem, POItem,  PurchaseOrder , QuoteStatus, POStatus
+from .models import Invoice, InvoiceStatus, Quote, QuoteItem, POItem,  PurchaseOrder , QuoteStatus, POStatus, FixedCharge, Expense, Attendance, AttendanceReport, ReportType
 from .services import InvoiceCalculator
 from django.utils import timezone
 from .services import EmailSending
 from django.core.cache import cache
 from datetime import timedelta
+from django.db.models import Q
+from django.core.files.base import ContentFile
 
 
 @shared_task(
@@ -20,7 +22,7 @@ from datetime import timedelta
 )
 def generate_invoice_pdf_task(self, invoice_id):
     try:
-        # Fetch invoice (Data is already calculated by the View)
+
         invoice = Invoice.objects.select_related("client", "created_by__company").get(
             id=invoice_id
         )
@@ -53,6 +55,8 @@ def generate_invoice_pdf_task(self, invoice_id):
         return f"Error: Invoice ID {invoice_id} not found."
     except Exception as exc:
         raise self.retry(exc=exc)
+
+
 @shared_task(
     blank=True,
     autoretry_for=(Exception,),
@@ -148,7 +152,7 @@ def generate_quote_pdf_task(quote_id):
         quote = Quote.objects.select_related("client", "created_by__company").get(id=quote_id)
         logo_path = os.path.join(settings.BASE_DIR, "static", "assets", "companyLogo.jpg")
         
-        # Note: We pass 'invoice' key to reuse the same variables in template easier
+        
         context = {
             "invoice": quote, 
             "company": quote.created_by.company,
@@ -165,3 +169,114 @@ def generate_quote_pdf_task(quote_id):
         return f"Quote {quote.quote_number} PDF Generated"
     except Exception as e:
         return f"Error: {str(e)}"
+
+
+
+@shared_task
+def generate_monthly_fixed_expenses():
+    today = timezone.now().date()
+    month_start = today.replace(day=1)
+
+    fixed_charges = FixedCharge.objects.filter(
+        is_active=True,
+        start_date__lte=today,
+    ).filter(
+        Q(end_date__isnull=True) |
+        Q(end_date__gte=today)
+    )
+
+    for charge in fixed_charges:
+        exists = Expense.objects.filter(
+            title=charge.title,
+            chantier=charge.chantier,
+            expense_date=month_start,
+        ).exists()
+
+        if exists:
+            print("expense already exist")
+            continue
+
+        Expense.objects.create(
+            chantier=charge.chantier,
+            title=charge.title,
+            category=charge.category,
+            amount=charge.amount,
+            expense_date=month_start,
+            created_by=charge.created_by,
+        )
+
+
+
+
+
+
+def _generate_attendance_pdf(start_date, end_date, title, report_type):
+
+    # 1. Query Data
+    attendances = Attendance.objects.filter(
+        date__range=[start_date, end_date]
+    ).select_related(
+        'employee__user', 
+        'chantier'
+    ).order_by('chantier__name', 'date', 'employee__user__last_name')
+
+    # 2. Context
+    context = {
+        'title': title,
+        'start_date': start_date,
+        'end_date': end_date,
+        'attendances': attendances,
+        'company_name': "TOURTRA",
+        'generated_at': timezone.now(),
+    }
+
+    # 3. Render HTML
+    html_string = render_to_string('pdf/pointage_pdf.html', context)
+
+    # 4. Generate PDF in Memory (Bytes)
+    # We do NOT write_pdf(path) here. We write to a variable.
+    pdf_bytes = HTML(string=html_string, base_url=settings.BASE_DIR).write_pdf()
+
+    # 5. Create the Model Entry
+    filename = f"{report_type}_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.pdf"
+    
+    report = AttendanceReport.objects.create(
+        title=title,
+        report_type=report_type,
+        start_date=start_date,
+        end_date=end_date
+    )
+    
+    # Save the file content to the FileField
+    # ContentFile wraps the bytes so Django treats it like an uploaded file
+    report.file.save(filename, ContentFile(pdf_bytes))
+
+    return report.file.url
+
+
+@shared_task
+def generate_weekly_pointage_pdf():
+    today = timezone.now().date()
+    start_date = today - timedelta(days=7) 
+    end_date = today - timedelta(days=1)
+    
+    title = "Rapport Hebdomadaire de Pointage"
+    
+    # Pass the ENUM type here
+    file_url = _generate_attendance_pdf(start_date, end_date, title, ReportType.WEEKLY)
+    
+    return f"Weekly Attendance Report generated: {file_url}"
+
+@shared_task
+def generate_monthly_pointage_pdf():
+    today = timezone.now().date()
+    first_day_this_month = today.replace(day=1)
+    end_date = first_day_this_month - timedelta(days=1)
+    start_date = end_date.replace(day=1)
+
+    title = "Rapport Mensuel de Pointage"
+    
+    # Pass the ENUM type here
+    file_url = _generate_attendance_pdf(start_date, end_date, title, ReportType.MONTHLY)
+    
+    return f"Monthly Attendance Report generated: {file_url}"

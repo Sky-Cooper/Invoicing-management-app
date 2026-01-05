@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { size: A4 landscape; margin: 1cm; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 11px; color: #333; }
+        
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #D32F2F; padding-bottom: 10px; }
+        .header h1 { margin: 0; color: #D32F2F; text-transform: uppercase; font-size: 18px; }
+        .header p { margin: 5px 0; font-weight: bold; }
+        
+        .meta-info { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 10px; color: #666; }
+
+        .chantier-section { margin-bottom: 25px; page-break-inside: avoid; }
+        .chantier-title { 
+            background-color: #333; 
+            color: #fff; 
+            padding: 5px 10px; 
+            font-weight: bold; 
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        th { background-color: #f2f2f2; border: 1px solid #ddd; padding: 6px; text-align: left; font-weight: bold; }
+        td { border: 1px solid #ddd; padding: 6px; }
+        
+        .status-present { color: green; font-weight: bold; }
+        .status-absent { color: red; font-weight: bold; }
+        .text-center { text-align: center; }
+        
+        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 9px; color: #999; border-top: 1px solid #ddd; padding-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ title }}</h1>
+        <p>Période : Du {{ start_date|date:"d/m/Y" }} au {{ end_date|date:"d/m/Y" }}</p>
+    </div>
+
+    <div class="meta-info">
+        <span>Généré le : {{ generated_at|date:"d/m/Y H:i" }}</span>
+        <span>Entreprise : {{ company_name }}</span>
+    </div>
+
+    {% if attendances %}
+        {# Group the list by Chantier #}
+        {% regroup attendances by chantier as chantier_list %}
+
+        {% for chantier_group in chantier_list %}
+        <div class="chantier-section">
+            <div class="chantier-title">CHANTIER : {{ chantier_group.grouper.name|upper }}</div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th width="15%">Date</th>
+                        <th width="30%">Employé</th>
+                        <th width="20%">Fonction</th>
+                        <th width="15%" class="text-center">Statut</th>
+                        <th width="10%" class="text-center">Heures</th>
+                        <th width="10%" class="text-center">Matricule (CIN)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in chantier_group.list %}
+                    <tr>
+                        <td>{{ record.date|date:"d/m/Y" }}</td>
+                        <td>{{ record.employee.user.get_full_name|upper }}</td>
+                        <td>{{ record.employee.job_title }}</td>
+                        <td class="text-center">
+                            {% if record.present %}
+                                <span class="status-present">PRÉSENT</span>
+                            {% else %}
+                                <span class="status-absent">ABSENT</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ record.hours_worked }}</td>
+                        <td class="text-center">{{ record.employee.cin }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div style="text-align: center; margin-top: 50px; color: #666;">
+            <h3>Aucune donnée de pointage trouvée pour cette période.</h3>
+        </div>
+    {% endif %}
+
+    <div class="footer">
+        Page générée automatiquement par le système de gestion {{ company_name }}.
+    </div>
+</body>
+</html>

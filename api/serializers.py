@@ -21,10 +21,15 @@ from api.models import (
     Quote,
     QuoteItem,
     PurchaseOrder, 
-    POItem
+    POItem,
+    ChantierDocument,
+    FixedCharge,
+    AttendanceReport
+
 )
 from django.db.models import Sum
 from django.conf import settings
+
 
 
 class CompanyOwnerRegistrationSerializer(serializers.Serializer):
@@ -536,6 +541,13 @@ class ChantierAssignmentSerializer(serializers.ModelSerializer):
 
         return attrs
 
+
+class ChantierDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChantierDocument
+        fields = ["id", "document", "created_at"]
+
+
 class ChantierSerializer(serializers.ModelSerializer):
     responsible = DepartmentAdminRetrieveSerializer(read_only=True, many=True)
     responsible_ids = serializers.PrimaryKeyRelatedField(
@@ -543,18 +555,29 @@ class ChantierSerializer(serializers.ModelSerializer):
         source="responsible",
         write_only=True,
         required=False,
-        many=True
+        many=True,
     )
 
     employees = ChantierAssignmentSerializer(
-        source="employee_assignments", many=True, read_only=True
-    )  
+        source="employee_assignments",
+        many=True,
+        read_only=True,
+    )
 
     employee_ids = serializers.PrimaryKeyRelatedField(
         queryset=Employee.objects.all(),
         write_only=True,
         required=False,
-        many=True
+        many=True,
+    )
+
+    documents = ChantierDocumentSerializer(many=True, read_only=True)
+
+
+    uploaded_documents = serializers.ListField(
+        child=serializers.FileField(),
+        write_only=True,
+        required=False,
     )
 
     class Meta:
@@ -565,18 +588,41 @@ class ChantierSerializer(serializers.ModelSerializer):
             "location",
             "description",
             "contract_number",
-            "document", 
             "contract_date",
             "department",
-            "employee_ids",
             "client",
+            "employee_ids",
+            "employees",
             "responsible",
             "responsible_ids",
             "start_date",
             "end_date",
-            "employees",
+            "documents",
+            "uploaded_documents",
             "created_at",
         ]
+
+    def create(self, validated_data):
+        uploaded_documents = validated_data.pop("uploaded_documents", [])
+        employee_ids = validated_data.pop("employee_ids", [])
+
+        chantier = super().create(validated_data)
+
+       
+        for employee in employee_ids:
+            ChantierAssignment.objects.create(
+                chantier=chantier,
+                employee=employee,
+            )
+
+    
+        for file in uploaded_documents:
+            ChantierDocument.objects.create(
+                chantier=chantier,
+                document=file,
+            )
+
+        return chantier
 
 
 
@@ -926,7 +972,7 @@ class QuoteSerializer(serializers.ModelSerializer):
         return f"{settings.MEDIA_URL}quotes/{filename}"
 
 class QuoteCreateSerializer(serializers.ModelSerializer):
-    items = QuoteItemSerializer(many=True) # Nested Write
+    items = QuoteItemSerializer(many=True) 
     class Meta:
         model = Quote
         fields = "__all__"
@@ -970,7 +1016,7 @@ class POCreateSerializer(serializers.ModelSerializer):
 class QuotePatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Quote
-        fields = ["status", "project_description", "valid_until", "chantier"]
+        fields = ["status", "project_description", "valid_until"]
         read_only_fields = [
             "subtotal", "total_ht", "total_ttc", "amount_in_words", "discount_amount", "tax_amount"
         ]
@@ -978,7 +1024,72 @@ class QuotePatchSerializer(serializers.ModelSerializer):
 class POPatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchaseOrder
-        fields = ["status", "project_description", "expected_delivery_date", "chantier"]
+        fields = ["status", "project_description", "expected_delivery_date"]
         read_only_fields = [
             "subtotal", "total_ht", "total_ttc", "amount_in_words", "discount_amount", "tax_amount"
         ]
+
+
+
+class FixedChargeSerializer(serializers.ModelSerializer):
+    chantier_name = serializers.CharField(source="chantier.name", read_only=True)
+    created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = FixedCharge
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "created_by"]
+
+    def validate_chantier(self, value):
+        user = self.context["request"].user
+     
+        if value.department.company != user.company:
+            raise serializers.ValidationError("This chantier does not belong to your company.")
+        return value
+
+
+
+
+class FixedChargeSerializer(serializers.ModelSerializer):
+    chantier_name = serializers.CharField(source="chantier.name", read_only=True)
+    created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = FixedCharge
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "created_by"]
+
+    def validate_chantier(self, value):
+        user = self.context["request"].user
+
+        if value.department.company != user.company:
+            raise serializers.ValidationError("This chantier does not belong to your company.")
+        return value
+
+
+
+
+
+class AttendanceReportSerializer(serializers.ModelSerializer):
+  
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AttendanceReport
+        fields = [
+            "id",
+            "title", 
+            "report_type", 
+            "start_date", 
+            "end_date", 
+            "file",      
+            "file_url",  
+            "created_at"
+        ]
+        read_only_fields = fields
+
+    def get_file_url(self, obj):
+        request = self.context.get('request')
+        if obj.file and request:
+            return request.build_absolute_uri(obj.file.url)
+        return None

@@ -10,6 +10,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 from django.db.models import Max
+from django.core.files.base import ContentFile
 
 
 class LanguageChoices(models.TextChoices):
@@ -46,6 +47,11 @@ class PaymentMethod(models.TextChoices):
     CHECK = "CHECK", "Check"
     CREDIT_CARD = "CREDIT_CARD", "Credit Card"
 
+class ReportType(models.TextChoices):
+    WEEKLY = "WEEKLY", "Weekly"
+    MONTHLY = "MONTHLY", "Monthly"
+
+    
 
 class ApplicationUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -290,11 +296,6 @@ class Chantier(models.Model):
         related_name="responsible_chantiers",
         limit_choices_to={"role": UserRole.HR_ADMIN},
     )
-    document = models.FileField(
-        upload_to="chantiers/",
-        null=True,
-        blank=True
-    )
 
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
@@ -317,6 +318,24 @@ class Chantier(models.Model):
             return "COMPLETED"
         else:
             return "IN_PROGRESS"
+
+
+class ChantierDocument(models.Model):
+    chantier = models.ForeignKey(
+        Chantier,
+        on_delete=models.CASCADE,
+        related_name="documents",
+    )
+    document = models.FileField(upload_to="chantiers/")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Document {self.id} for {self.chantier.name}"
+
+
+    
+
 
 
 class ChantierAssignment(models.Model):
@@ -504,6 +523,38 @@ class InvoiceItem(models.Model):
         super().save(*args, **kwargs)
 
 
+class FixedCharge(models.Model):
+    chantier = models.ForeignKey(
+        Chantier,
+        on_delete=models.CASCADE,
+        related_name="fixed_charges",
+    )
+
+    title = models.CharField(max_length=255)
+    category = models.CharField(
+        max_length=50,
+        choices=ExpenseCategory.choices,
+    )
+
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="fixed_charges",
+    )
+
+    def __str__(self):
+        return f"{self.title} ({self.amount})"
+
+
 class Expense(models.Model):
     chantier = models.ForeignKey(
         Chantier, on_delete=models.CASCADE, related_name="expenses"
@@ -580,7 +631,6 @@ class POStatus(models.TextChoices):
 class Quote(models.Model):
     quote_number = models.CharField(max_length=50, unique=True)
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="quotes")
-    chantier = models.ForeignKey(Chantier, on_delete=models.SET_NULL, null=True, blank=True, related_name="quotes")
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="created_quotes")
     
     status = models.CharField(max_length=20, choices=QuoteStatus.choices, default=QuoteStatus.DRAFT)
@@ -633,7 +683,7 @@ class QuoteItem(models.Model):
 class PurchaseOrder(models.Model):
     po_number = models.CharField(max_length=50, unique=True)
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="purchase_orders")
-    chantier = models.ForeignKey(Chantier, on_delete=models.SET_NULL, null=True, blank=True, related_name="purchase_orders")
+   
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="created_pos")
     
     status = models.CharField(max_length=20, choices=POStatus.choices, default=POStatus.DRAFT)
@@ -680,3 +730,20 @@ class POItem(models.Model):
             
         self.subtotal = self.quantity * self.unit_price
         super().save(*args, **kwargs)
+
+
+
+
+
+class AttendanceReport(models.Model):
+    title = models.CharField(max_length=255)
+    report_type = models.CharField(max_length=20, choices=ReportType.choices)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    
+    file = models.FileField(upload_to='reports/attendance/')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.start_date} - {self.end_date})"
