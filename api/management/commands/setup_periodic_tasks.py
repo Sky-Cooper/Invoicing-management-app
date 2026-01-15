@@ -51,13 +51,13 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
 
         # 🔹 Testing schedule (every 5 minutes)
-        testing_schedule, _ = CrontabSchedule.objects.get_or_create(
-            minute="*/5",
-            hour="*",
-            day_of_week="*",
-            day_of_month="*",
-            month_of_year="*",
-        )
+        # testing_schedule, _ = CrontabSchedule.objects.get_or_create(
+        #     minute="*/5",
+        #     hour="*",
+        #     day_of_week="*",
+        #     day_of_month="*",
+        #     month_of_year="*",
+        # )
 
         # 🔹 Monthly fixed expense schedule (daily at 02:00)
         monthly_schedule, _ = CrontabSchedule.objects.get_or_create(
@@ -103,16 +103,16 @@ class Command(BaseCommand):
             name="Generate Weekly Attendance Report",
             defaults={
                 "crontab": weekly_schedule,
-                "task": "api.tasks.generate_weekly_pointage_pdf", # Matches the function name in tasks.py
+                "task": "api.tasks.generate_weekly_pointage_pdf", 
             },
         )
 
-        # Monthly Pointage
+       
         PeriodicTask.objects.update_or_create(
             name="Generate Monthly Attendance Report",
             defaults={
                 "crontab": monthly_schedule,
-                "task": "api.tasks.generate_monthly_pointage_pdf", # Matches the function name in tasks.py
+                "task": "api.tasks.generate_monthly_pointage_pdf", 
             },
         )
 
