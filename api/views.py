@@ -19,7 +19,8 @@ from .models import (
     EmployeeWorkingContract,
     EmployeeEOSB,
     FixedCharge, 
-    AttendanceReport
+    AttendanceReport,
+    
 )
 from .models import Quote, QuoteItem, PurchaseOrder, POItem, ReportType
 from .serializers import (
@@ -143,11 +144,15 @@ class CookieTokenRefreshView(TokenRefreshView):
 
 class CompanyOwnerRegistrationView(APIView):
     permission_classes = []
-    # Protect registration from bots
     throttle_scope = 'auth_limit'
     throttle_classes = [ScopedRateThrottle]
 
     def post(self, request):
+        if User.objects.filter(role = UserRole.COMPANY_ADMIN).exists():
+            return Response(
+                {"message": "Company admin already exists"},
+                status=400
+            )
         serializer = CompanyOwnerRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
