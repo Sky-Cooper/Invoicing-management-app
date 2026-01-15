@@ -45,9 +45,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # CORS
 # ------------------
 
-CORS_ALLOWED_ORIGINS = [
-    "https://yourfrontend.com",
-]
+
 
 # ------------------
 # Redis / Celery
@@ -76,3 +74,15 @@ LOGGING = {
         },
     },
 }
+
+
+
+CSRF_TRUSTED_ORIGINS = [
+    f"https://{os.getenv('DOMAIN_NAME')}",
+]
+
+# Update this with your actual frontend URL later
+CORS_ALLOWED_ORIGINS = [
+    "https://tourtra.ma", # If your frontend is on the main domain
+    "http://localhost:3000", # For local frontend testing
+]
