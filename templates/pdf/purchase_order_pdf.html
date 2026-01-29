@@ -88,7 +88,13 @@
     <div class="totals-container">
         <table class="totals-table">
             <tr><td class="total-label">Total HT (DH)</td> <td class="total-value">{{ invoice.subtotal|floatformat:2 }}</td></tr>
-            <tr><td class="total-label">Réception provisoire 10% (DH)</td> <td class="total-value">{{ invoice.discount_amount|floatformat:2 }}</td></tr>
+            <tr>
+  <td class="total-label">
+    Réception provisoire {{ invoice.discount_percentage|floatformat:0 }}% (DH)
+  </td>
+  <td class="total-value">{{ invoice.discount_amount|floatformat:2 }}</td>
+</tr>
+
             <tr><td class="total-label">PRIX TOTAL HT APRES DEDUCTION (DH)</td> <td class="total-value">{{ invoice.total_ht|floatformat:2 }}</td></tr>
             <tr><td class="total-label">TVA {{ invoice.tax_rate|floatformat:0 }}% (DH)</td> <td class="total-value">{{ invoice.tax_amount|floatformat:2 }}</td></tr>
             <tr class="grand-total"><td class="total-label" style="color: #000;">TOTAL TTC (DH)</td> <td class="total-value">{{ invoice.total_ttc|floatformat:2 }}</td></tr>

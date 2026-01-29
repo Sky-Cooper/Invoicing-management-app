@@ -909,50 +909,52 @@ class QuoteCreateApiView(APIView):
 
     @transaction.atomic
     def post(self, request):
-        serializer = QuoteCreateSerializer(data=request.data, context={"request": request})
+        serializer = QuoteCreateSerializer(
+            data=request.data,
+            context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
-        
+
         items_data = serializer.validated_data.pop("items")
+
+      
+        discount_percentage = serializer.validated_data.get("discount_percentage", Decimal("0"))
+        tax_rate = serializer.validated_data.get("tax_rate", Decimal("0"))
+
         quote = serializer.save(created_by=request.user)
- 
-        subtotal = 0
+
+        subtotal = Decimal("0")
         for item_data in items_data:
             item = QuoteItem.objects.create(quote=quote, **item_data)
             subtotal += item.subtotal
 
-
-        retention_rate = Decimal("10.0")
-        discount_amount = subtotal * (retention_rate / Decimal("100"))
+        discount_amount = subtotal * (discount_percentage / Decimal("100"))
         total_ht = subtotal - discount_amount
-        tax_rate = Decimal("20.0")
         tax_amount = total_ht * (tax_rate / Decimal("100"))
         total_ttc = total_ht + tax_amount
-        
- 
+
         quote.subtotal = subtotal
-        quote.discount_percentage = retention_rate
         quote.discount_amount = discount_amount
         quote.total_ht = total_ht
-        quote.tax_rate = tax_rate
         quote.tax_amount = tax_amount
         quote.total_ttc = total_ttc
-        
 
+  
         dirhams = int(total_ttc)
         centimes = int(round((total_ttc - dirhams) * 100))
-        dirhams_words = num2words(dirhams, lang="fr")
-        if centimes > 0:
-            legal_text = f"{dirhams_words} Dirhams Et {centimes} Cts TTC"
-        else:
-            legal_text = f"{dirhams_words} Dirhams TTC"
-        quote.amount_in_words = legal_text.upper()
-        
+        words = num2words(dirhams, lang="fr")
+        quote.amount_in_words = (
+            f"{words} Dirhams Et {centimes} Cts TTC"
+            if centimes > 0
+            else f"{words} Dirhams TTC"
+        ).upper()
+
         quote.save()
-        
 
         transaction.on_commit(lambda: generate_quote_pdf_task.delay(quote.id))
-        
+
         return Response(QuoteSerializer(quote).data, status=status.HTTP_201_CREATED)
+
 
     def get(self, request):
         user = request.user
@@ -970,49 +972,50 @@ class POCreateApiView(APIView):
 
     @transaction.atomic
     def post(self, request):
-        serializer = POCreateSerializer(data=request.data, context={"request": request})
+        serializer = POCreateSerializer(
+            data=request.data,
+            context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
-        
+
         items_data = serializer.validated_data.pop("items")
+
+        discount_percentage = serializer.validated_data.get("discount_percentage", Decimal("0"))
+        tax_rate = serializer.validated_data.get("tax_rate", Decimal("0"))
+
         po = serializer.save(created_by=request.user)
-        
-        subtotal = 0
+
+        subtotal = Decimal("0")
         for item_data in items_data:
             item = POItem.objects.create(purchase_order=po, **item_data)
             subtotal += item.subtotal
-            
-     
-        retention_rate = Decimal("10.0")
-        discount_amount = subtotal * (retention_rate / Decimal("100"))
+
+        discount_amount = subtotal * (discount_percentage / Decimal("100"))
         total_ht = subtotal - discount_amount
-        tax_rate = Decimal("20.0")
         tax_amount = total_ht * (tax_rate / Decimal("100"))
         total_ttc = total_ht + tax_amount
-        
- 
+
         po.subtotal = subtotal
-        po.discount_percentage = retention_rate
         po.discount_amount = discount_amount
         po.total_ht = total_ht
-        po.tax_rate = tax_rate
         po.tax_amount = tax_amount
         po.total_ttc = total_ttc
-        
 
         dirhams = int(total_ttc)
         centimes = int(round((total_ttc - dirhams) * 100))
-        dirhams_words = num2words(dirhams, lang="fr")
-        if centimes > 0:
-            legal_text = f"{dirhams_words} Dirhams Et {centimes} Cts TTC"
-        else:
-            legal_text = f"{dirhams_words} Dirhams TTC"
-        po.amount_in_words = legal_text.upper()
-        
+        words = num2words(dirhams, lang="fr")
+        po.amount_in_words = (
+            f"{words} Dirhams Et {centimes} Cts TTC"
+            if centimes > 0
+            else f"{words} Dirhams TTC"
+        ).upper()
+
         po.save()
-        
+
         transaction.on_commit(lambda: generate_po_pdf_task.delay(po.id))
-        
+
         return Response(POSerializer(po).data, status=status.HTTP_201_CREATED)
+
 
     def get(self, request):
         user = request.user
