@@ -22,6 +22,8 @@ from .models import (
     AttendanceReport,
     
 )
+from .filters import ExpenseFilter
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import Quote, QuoteItem, PurchaseOrder, POItem, ReportType
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -508,19 +510,27 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ExpenseFilter
+
     def get_queryset(self):
         user = self.request.user
 
+        qs = Expense.objects.all()
+
         if user.is_superuser:
-            return Expense.objects.all()
+            return qs
 
-        if user.role == UserRole.COMPANY_ADMIN: 
-            return Expense.objects.filter(chantier__department__company=user.company)
+        if user.role == UserRole.COMPANY_ADMIN:
+            return qs.filter(
+                chantier__department__company=user.company
+            )
 
-        if user.role  in [UserRole.INVOICING_ADMIN, UserRole.HR_ADMIN]:
-            return Expense.objects.filter(created_by = user)
+        if user.role in [UserRole.INVOICING_ADMIN, UserRole.HR_ADMIN]:
+            return qs.filter(created_by=user)
 
-        return Expense.objects.none()
+        return qs.none()
 
     def perform_create(self, serializer):
         serializer.save()

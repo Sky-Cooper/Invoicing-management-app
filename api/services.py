@@ -28,40 +28,9 @@ class InvoiceGenerator:
             settings.BASE_DIR, "static", "assets", "companyLogo.jpg"
         )
 
-        items = invoice.invoice_items.all()
-
-        subtotal = sum(i.subtotal for i in items)
-
-        retention_rate = Decimal("10.0")
-
-        discount_amount = subtotal * (retention_rate / Decimal("100"))
-
-        total_ht = subtotal - discount_amount
-
-        tax_rate = Decimal("20.0")
-
-        tax_amount = total_ht * (tax_rate / Decimal("100"))
-
-        total_ttc = total_ht + tax_amount
-
-        invoice.subtotal = subtotal
-
-        invoice.discount_percentage = retention_rate
-
-        invoice.discount_amount = discount_amount
-
-        invoice.total_ht = total_ht
-
-        invoice.tax_rate = tax_rate
-
-        invoice.tax_amount = tax_amount
-
-        invoice.total_ttc = total_ttc
-
-        invoice.save()
 
         context = {
-            "invoice": invoice,
+            "invoice": invoice,  
             "company": invoice.created_by.company,
             "logo_path": logo_path,
         }
@@ -69,11 +38,9 @@ class InvoiceGenerator:
         html_string = render_to_string("pdf/invoice_template.html", context)
 
         pdf_name = f"invoice_{invoice.invoice_number.replace('/', '-')}.pdf"
-
         pdf_dir = os.path.join(settings.MEDIA_ROOT, "invoices")
 
         if not os.path.exists(pdf_dir):
-
             os.makedirs(pdf_dir)
 
         pdf_path = os.path.join(pdf_dir, pdf_name)
@@ -81,6 +48,7 @@ class InvoiceGenerator:
         HTML(string=html_string).write_pdf(pdf_path)
 
         return f"{settings.MEDIA_URL}invoices/{pdf_name}"
+
 
 
 class InvoiceCalculator:
@@ -105,29 +73,29 @@ class InvoiceCalculator:
 
     @staticmethod
     def get_totals(invoice):
-
         items = invoice.invoice_items.all()
         subtotal = sum(i.quantity * i.unit_price for i in items)
 
-        retention_rate = Decimal("10.0")
-        discount_amount = subtotal * (retention_rate / Decimal("100"))
+        discount_percentage = invoice.discount_percentage or Decimal("0")
+        discount_amount = subtotal * (discount_percentage / Decimal("100"))
 
         total_ht = subtotal - discount_amount
 
-        tax_rate = Decimal("20.0")
+        tax_rate = invoice.tax_rate or Decimal("0")
         tax_amount = total_ht * (tax_rate / Decimal("100"))
 
         total_ttc = total_ht + tax_amount
 
         return {
             "subtotal": subtotal,
-            "discount_percentage": retention_rate,
+            "discount_percentage": discount_percentage,
             "discount_amount": discount_amount,
             "total_ht": total_ht,
             "tax_rate": tax_rate,
             "tax_amount": tax_amount,
             "total_ttc": total_ttc,
         }
+
 
 
 class EmailSending:

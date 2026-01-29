@@ -696,29 +696,47 @@ class ItemSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ["id", "created_at"]
 
+class UserMinimalSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "full_name"]
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}"
+
+
+
 
 class ExpenseSerializer(serializers.ModelSerializer):
+    created_by = UserMinimalSerializer(read_only=True)
 
     class Meta:
         model = Expense
         fields = "__all__"
         read_only_fields = ["id", "created_at", "created_by"]
 
-    
     def create(self, validated_data):
-        user = self.context['request'].user
-        if not user.role  in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN, UserRole.HR_ADMIN]:
-            raise serializer.ValidationError("only company admin, invoicing admin , hr admin, allowed to create expenses")
+        user = self.context["request"].user
 
-        validated_data['created_by'] = user
+        if user.role not in [
+            UserRole.COMPANY_ADMIN,
+            UserRole.INVOICING_ADMIN,
+            UserRole.HR_ADMIN,
+        ]:
+            raise serializers.ValidationError(
+                "Only company admin, invoicing admin, HR admin can create expenses"
+            )
 
+        validated_data["created_by"] = user
         return super().create(validated_data)
-
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["chantier"] = ChantierSerializer(instance.chantier).data
         return data
+
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):

@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "phonenumber_field",
     "django_celery_results",
     "django_celery_beat",
+    "django_filters",
 ]
 
 MIDDLEWARE = [
@@ -207,5 +208,8 @@ REST_FRAMEWORK = {
         'financial_ai': '10/day',
         'auth_limit': '5/minute',
     },
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+    ],
     
 }
