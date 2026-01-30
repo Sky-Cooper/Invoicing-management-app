@@ -56,7 +56,8 @@ from .serializers import (
     QuotePatchSerializer,
     POPatchSerializer,
     FixedChargeSerializer,
-    AttendanceReportSerializer
+    AttendanceReportSerializer,
+    GenerateAttendanceReportSerializer
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.views import APIView
@@ -79,7 +80,7 @@ from django.http import HttpResponse
 import tempfile
 from django.db import transaction
 from num2words import num2words
-from .tasks import generate_invoice_pdf_task, send_thanking_invoice_task,generate_po_pdf_task, generate_quote_pdf_task
+from .tasks import generate_invoice_pdf_task, send_thanking_invoice_task,generate_po_pdf_task, generate_quote_pdf_task, _generate_attendance_pdf
 from .services import InvoiceCalculator
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -1143,3 +1144,35 @@ class AttendanceReportViewSet(viewsets.ReadOnlyModelViewSet):
 
         serializer = self.get_serializer(reports, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='generate')
+    def generate_custom_report(self, request):
+        serializer = GenerateAttendanceReportSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        start_date = serializer.validated_data['start_date']
+        end_date = serializer.validated_data['end_date']
+
+        title = f"Rapport de Pointage ({start_date} → {end_date})"
+
+        file_url = _generate_attendance_pdf(
+            start_date=start_date,
+            end_date=end_date,
+            title=title,
+            report_type=ReportType.CUSTOM
+        )
+
+        return Response(
+            {
+                "message": "Attendance report generated successfully",
+                "file_url": file_url
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+
+
+

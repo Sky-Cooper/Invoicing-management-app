@@ -135,21 +135,31 @@
 
     <div class="totals-container">
         <table class="totals-table">
-                        <{% if invoice.discount_percentage > 0 %}
-            <tr>
-                <td class="total-label">
-                    Réception provisoire et définitif {{ invoice.discount_percentage|floatformat:0 }}% (DH)
-                </td>
-                <td class="total-value">
-                    {{ invoice.discount_amount|floatformat:2 }}
-                </td>
-            </tr>
-            {% endif %}
+                       {% if invoice.discount_percentage > 0 %}
+<tr>
+    <td class="total-label">
+        Réception provisoire et définitif {{ invoice.discount_percentage|floatformat:0 }}% (DH)
+    </td>
+    <td class="total-value">
+        {{ invoice.discount_amount|floatformat:2 }}
+    </td>
+</tr>
+{% endif %}
+
 
             <tr>
-                <td class="total-label">PRIX TOTAL HT APRES DEDUCTION {{ invoice.discount_percentage|floatformat:0 }}% (DH)
-</td> <td class="total-value">{{ invoice.total_ht|floatformat:2 }}</td>
-            </tr>
+    <td class="total-label">
+        PRIX TOTAL HT
+        {% if invoice.discount_percentage > 0 %}
+            APRES DEDUCTION {{ invoice.discount_percentage|floatformat:0 }}%
+        {% endif %}
+        (DH)
+    </td>
+    <td class="total-value">
+        {{ invoice.total_ht|floatformat:2 }}
+    </td>
+</tr>
+
             <tr>
                 <td class="total-label">TVA {{ invoice.tax_rate|floatformat:0 }}% (DH)</td> <td class="total-value">{{ invoice.tax_amount|floatformat:2 }}</td>
             </tr>

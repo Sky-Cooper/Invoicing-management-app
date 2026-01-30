@@ -1111,3 +1111,26 @@ class AttendanceReportSerializer(serializers.ModelSerializer):
         if obj.file and request:
             return request.build_absolute_uri(obj.file.url)
         return None
+
+
+
+class GenerateAttendanceReportSerializer(serializers.Serializer):
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+
+    def validate(self, attrs):
+        start = attrs['start_date']
+        end = attrs['end_date']
+
+        if start > end:
+            raise serializers.ValidationError(
+                "start_date must be before end_date"
+            )
+
+        if (end - start).days > 366:
+            raise serializers.ValidationError(
+                "Date range too large"
+            )
+
+        return attrs
+

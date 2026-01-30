@@ -50,6 +50,7 @@ class PaymentMethod(models.TextChoices):
 class ReportType(models.TextChoices):
     WEEKLY = "WEEKLY", "Weekly"
     MONTHLY = "MONTHLY", "Monthly"
+    CUSTOM = "CUSTOM", "Custom"
 
     
 
