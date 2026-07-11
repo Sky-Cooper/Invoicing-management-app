@@ -60,5 +60,5 @@ class IsCompanyOrSuperAdmin(BasePermission):
         if not request.user.is_authenticated:
             return False
 
-        allowed_roles = [UserRole.COMPANY_ADMIN]
-        return request.user.role in allowed_roles
+        allowed_roles = [UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN]
+        return request.user.is_superuser or request.user.role in allowed_roles

@@ -141,7 +141,7 @@ class CookieTokenRefreshView(TokenRefreshView):
         serializer.is_valid(raise_exception=True)
         access_token = serializer.validated_data["access"]
         
-        response = Response({"access_token": access_token}, status=200)
+        response = Response({"access": access_token}, status=200)
         response.set_cookie(key="access_token", value=access_token, httponly=False, secure=not settings.DEBUG)
         return response
 
@@ -344,7 +344,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
 class EmployeeEOSBViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeeEOSBSerializer
-    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrHRAdmin]
     parser_classes = [MultiPartParser, FormParser]
 
     def get_queryset(self):
@@ -353,16 +353,16 @@ class EmployeeEOSBViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return EmployeeEOSB.objects.all()
 
-        if user.role == UserRole.COMPANY_ADMIN:
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
             return EmployeeEOSB.objects.filter(employee__user__company = user.company)
 
         return EmployeeEOSB.objects.none()
-      
+
 
 
 class EmployeeWorkingContractViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeeWorkingContractSerializer
-    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrHRAdmin]
     parser_classes = [MultiPartParser, FormParser]
 
     def get_queryset(self):
@@ -370,8 +370,8 @@ class EmployeeWorkingContractViewSet(viewsets.ModelViewSet):
 
         if user.is_superuser:
             return EmployeeWorkingContract.objects.all()
-        
-        if user.role == UserRole.COMPANY_ADMIN:
+
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.HR_ADMIN]:
             return EmployeeWorkingContract.objects.filter(employee__user__company = user.company)
 
         return EmployeeWorkingContract.objects.none()
@@ -432,7 +432,7 @@ class ChantierViewSet(viewsets.ModelViewSet):
 
 class ChantierAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = ChantierAssignmentSerializer
-    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCompanyOrHRAdmin]
 
     def get_queryset(self):
         user = self.request.user
@@ -1085,7 +1085,7 @@ class GetEmployeeBasedOnChantier(generics.ListAPIView):
 
 class FixedChargeViewSet(viewsets.ModelViewSet):
     serializer_class = FixedChargeSerializer
-    permission_classes = [permissions.IsAuthenticated, IsCompanyOrSuperAdmin]
+    permission_classes = [permissions.IsAuthenticated, CanManageInvoices]
 
     def get_queryset(self):
         user = self.request.user
@@ -1096,7 +1096,7 @@ class FixedChargeViewSet(viewsets.ModelViewSet):
 
         # 2. Company Users see only their company's fixed charges
         # Path: FixedCharge -> Chantier -> Department -> Company
-        if user.role == UserRole.COMPANY_ADMIN:
+        if user.role in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN]:
             return FixedCharge.objects.filter(chantier__department__company=user.company)
 
         return FixedCharge.objects.none()
@@ -1104,8 +1104,8 @@ class FixedChargeViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
 
-  
-        if user.role not in [UserRole.COMPANY_ADMIN] and not user.is_superuser:
+
+        if user.role not in [UserRole.COMPANY_ADMIN, UserRole.INVOICING_ADMIN] and not user.is_superuser:
             raise PermissionDenied("You do not have permission to create fixed charges.")
 
         serializer.save(created_by=user)
